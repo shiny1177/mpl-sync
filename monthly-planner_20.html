@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>月计划表</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+:root{
+  --bg:#f7f6f3;--surface:#fff;--sf2:#f0ede8;
+  --bd:#e2ddd7;--bd2:#c9c3bb;
+  --tp:#1a1714;--ts:#6b6560;--tm:#a09890;
+  --ac:#3c5a9a;--acbg:#eef1f9;--actl:#2a4080;
+  --r:10px;--sh:0 1px 3px rgba(0,0,0,.06),0 4px 12px rgba(0,0,0,.04);
+  --todo-ac:#d4820a;--todo-acbg:#fff8ed;--todo-bd:#f5d08a;
+}
+[data-theme="dark"]{
+  --bg:#141210;--surface:#1e1c19;--sf2:#252220;
+  --bd:#302c28;--bd2:#46413b;
+  --tp:#f0ece6;--ts:#9a9088;--tm:#6a6260;
+  --ac:#7b9dd4;--acbg:#1e2535;--actl:#a0bcec;
+  --sh:0 1px 3px rgba(0,0,0,.3),0 4px 12px rgba(0,0,0,.2);
+  --todo-ac:#f0a832;--todo-acbg:#2a2010;--todo-bd:#6a4e10;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:15px}
+body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--tp);min-height:100vh;padding:2rem 1.25rem 5rem;transition:background .2s,color .2s}
+.app{max-width:1120px;margin:0 auto}
+
+/* ── top bar ── */
+.top-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.75rem}
+.top-title{font-size:22px;font-weight:600;letter-spacing:-.3px}
+.top-acts{display:flex;gap:8px}
+.ib{background:var(--surface);border:.5px solid var(--bd);border-radius:var(--r);width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ts);font-size:17px;box-shadow:var(--sh);transition:background .15s,color .15s;flex-shrink:0}
+.ib:hover{background:var(--sf2);color:var(--tp)}
+.ib.on{background:var(--acbg);color:var(--ac);border-color:var(--ac)}
+
+/* ── tabs ── */
+.tab-bar{display:flex;gap:2px;background:var(--sf2);border-radius:calc(var(--r)+2px);padding:3px;margin-bottom:1.5rem;border:.5px solid var(--bd)}
+.tab-btn{flex:1;padding:8px 0;font-size:13px;font-weight:500;border:none;border-radius:var(--r);cursor:pointer;font-family:inherit;color:var(--tm);background:none;transition:all .15s}
+.tab-btn.on{background:var(--surface);color:var(--tp);box-shadow:var(--sh)}
+.panel{display:none}.panel.on{display:block}
+
+/* ── calendar panel: two-column layout ── */
+.cal-layout{display:grid;grid-template-columns:1fr 260px;gap:16px;align-items:start}
+.cal-main{min-width:0}
+
+/* ── month nav ── */
+.mnav{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem}
+.mlabel{font-size:20px;font-weight:600}
+.msub{font-size:12px;color:var(--tm);margin-top:2px}
+.mnav-btns{display:flex;gap:6px}
+
+/* ── weekday header ── */
+.wk-row{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px}
+.wk-lbl{text-align:center;font-size:11px;color:var(--tm);font-weight:600;padding:4px 0;letter-spacing:.4px}
+
+/* ── calendar grid ── */
+.day-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;user-select:none}
+.dc{
+  background:var(--surface);border:.5px solid var(--bd);border-radius:var(--r);
+  min-height:72px;padding:6px 7px 7px;cursor:pointer;box-shadow:var(--sh);
+  transition:border-color .15s,box-shadow .15s;
+  position:relative;
+}
+.dc:hover{border-color:var(--bd2)}
+.dc.empty{background:transparent;border-color:transparent;box-shadow:none;cursor:default}
+.dc.today{border-color:var(--ac);border-width:1.5px}
+.dc.has-note{border-color:var(--bd2)}
+.dc.wknd .dnum{color:var(--tm)}
+.dc.today .dnum{color:var(--actl);font-weight:700}
+.dc.sel-mode{cursor:crosshair}
+.dc.sel-mode:hover{box-shadow:0 0 0 2px var(--ac)}
+.dc.picked{box-shadow:0 0 0 2px var(--ac)!important}
+.dc.picked::after{content:'✓';position:absolute;top:3px;right:5px;font-size:9px;color:var(--ac);font-weight:700}
+.dnum{font-size:12px;font-weight:500;color:var(--ts);line-height:1;margin-bottom:4px}
+/* items inside each day */
+.day-items{display:flex;flex-direction:column;gap:3px}
+.day-item-line{display:flex;align-items:flex-start;gap:4px}
+.di-chip{
+  display:inline-block;font-size:9px;padding:1px 5px;border-radius:8px;
+  font-weight:600;white-space:nowrap;flex-shrink:0;line-height:1.5;margin-top:1px;
+}
+.di-text{font-size:10.5px;color:var(--ts);line-height:1.4;word-break:break-all}
+
+/* ── select toolbar ── */
+.sel-bar{display:none;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:.5px solid var(--bd2);border-radius:var(--r);padding:10px 14px;margin-bottom:10px;box-shadow:var(--sh)}
+.sel-bar.on{display:flex}
+.sb-lbl{font-size:12px;color:var(--ts);font-weight:500;white-space:nowrap}
+.swatches{display:flex;gap:6px;flex-wrap:wrap}
+.sw{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .12s,border-color .12s;flex-shrink:0}
+.sw:hover{transform:scale(1.2)}.sw.act{border-color:var(--tp)}
+.sw.clr{background:var(--sf2);border:1.5px dashed var(--bd2);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--tm)}
+.sb-div{width:.5px;height:20px;background:var(--bd2)}
+.sb-cnt{font-size:12px;color:var(--ac);font-weight:600}
+.sb-clear{font-size:12px;color:var(--tm);cursor:pointer;padding:3px 8px;border-radius:6px;border:.5px solid var(--bd);background:none;font-family:inherit}
+.sb-clear:hover{background:var(--sf2)}
+
+/* ── legend ── */
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:1rem;padding-top:1rem;border-top:.5px solid var(--bd)}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--tm)}
+.leg-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+
+/* ── theme block ── */
+.theme-block{margin-top:1rem;background:var(--surface);border:.5px solid var(--bd);border-radius:var(--r);padding:12px 16px;box-shadow:var(--sh)}
+.sec-lbl{font-size:11px;color:var(--tm);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.sec-lbl i{font-size:14px}
+.plain-ta{width:100%;border:none;background:none;font-family:inherit;font-size:13px;color:var(--tp);line-height:1.7;resize:none;outline:none;min-height:32px;max-height:100px;overflow-y:auto}
+.plain-ta::placeholder{color:var(--tm)}
+
+/* ── stats ── */
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.stat-card{background:var(--surface);border:.5px solid var(--bd);border-radius:var(--r);padding:10px 12px;box-shadow:var(--sh)}
+.slbl{font-size:10px;color:var(--tm);font-weight:500;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.sval{font-size:18px;font-weight:600;color:var(--tp)}
+.chip{display:inline-block;font-size:9.5px;padding:1px 6px;border-radius:10px;font-weight:600}
+
+/* ── TODO ASIDE ── */
+.todo-aside{
+  background:var(--surface);border:1.5px solid var(--todo-bd);border-radius:var(--r);
+  padding:16px;box-shadow:var(--sh);position:sticky;top:20px;
+}
+.todo-title{font-size:14px;font-weight:600;color:var(--todo-ac);margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.todo-month{font-size:11px;color:var(--todo-ac);opacity:.7;margin-bottom:12px}
+
+/* add-todo input row */
+.todo-add-row{display:flex;gap:6px;margin-bottom:12px}
+.todo-inp{
+  flex:1;min-width:0;font-size:12px;border:.5px solid var(--bd2);border-radius:8px;
+  padding:6px 10px;font-family:inherit;color:var(--tp);background:var(--sf2);outline:none;
+  transition:border-color .15s;
+}
+.todo-inp:focus{border-color:var(--todo-ac)}
+.todo-inp::placeholder{color:var(--tm)}
+.todo-add-btn{
+  background:var(--todo-acbg);border:.5px solid var(--todo-bd);color:var(--todo-ac);
+  border-radius:8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:16px;flex-shrink:0;transition:opacity .12s;
+}
+.todo-add-btn:hover{opacity:.75}
+
+/* todo list */
+.todo-list{display:flex;flex-direction:column;gap:2px}
+.todo-item{
+  display:flex;align-items:flex-start;gap:8px;padding:7px 6px;border-radius:8px;
+  cursor:default;transition:background .12s;group:true;
+}
+.todo-item:hover{background:var(--sf2)}
+.todo-cb{
+  width:17px;height:17px;border-radius:5px;border:1.5px solid var(--bd2);
+  flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  margin-top:1px;transition:all .15s;background:none;
+}
+.todo-cb.done{background:var(--todo-ac);border-color:var(--todo-ac)}
+.todo-cb i{font-size:11px;color:#fff;display:none}
+.todo-cb.done i{display:block}
+.todo-text{
+  flex:1;min-width:0;font-size:12.5px;line-height:1.55;color:var(--tp);
+  word-break:break-all;transition:color .15s;
+}
+.todo-text.done{color:var(--tm);text-decoration:line-through;text-decoration-color:var(--tm)}
+.todo-del{
+  opacity:0;background:none;border:none;cursor:pointer;color:var(--tm);
+  font-size:14px;padding:1px 3px;flex-shrink:0;transition:opacity .12s,color .12s;
+}
+.todo-item:hover .todo-del{opacity:1}
+.todo-del:hover{color:#c0392b}
+.todo-empty{font-size:12px;color:var(--tm);text-align:center;padding:20px 0;font-style:italic}
+
+/* separator */
+.todo-sep{height:.5px;background:var(--bd);margin:8px 0}
+.todo-done-label{font-size:10px;color:var(--tm);font-weight:600;letter-spacing:.4px;text-transform:uppercase;padding:0 6px;margin-bottom:4px}
+
+/* ── Note modal ── */
+.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:100;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.ov.on{display:flex}
+@keyframes pop{from{transform:scale(.94);opacity:0}to{transform:scale(1);opacity:1}}
+.modal{background:var(--surface);border:.5px solid var(--bd2);border-radius:14px;padding:1.5rem;width:420px;max-width:95vw;box-shadow:0 8px 40px rgba(0,0,0,.18);animation:pop .18s ease-out}
+.modal-date{font-size:12px;color:var(--tm);font-weight:500;letter-spacing:.3px;margin-bottom:3px}
+.modal-title{font-size:16px;font-weight:600;margin-bottom:16px}
+.msec{font-size:11px;color:var(--tm);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px}
+
+/* item rows in note modal */
+.items-list{display:flex;flex-direction:column;gap:7px;margin-bottom:8px;max-height:400px;overflow-y:auto}
+.item-row{display:flex;align-items:flex-start;gap:7px;border-radius:8px;padding:2px 0;transition:background .12s}
+.item-row.drag-over{background:var(--acbg);outline:1.5px dashed var(--ac)}
+.item-row.dragging{opacity:.35}
+.drag-handle{cursor:grab;color:var(--tm);font-size:15px;flex-shrink:0;padding:7px 1px 0;transition:color .12s}
+.drag-handle:hover{color:var(--ts)}.drag-handle:active{cursor:grabbing}
+.item-tag-btn{
+  display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;
+  border:.5px solid var(--bd2);cursor:pointer;font-size:11px;font-weight:600;
+  font-family:inherit;background:none;white-space:nowrap;flex-shrink:0;transition:all .12s;
+  margin-top:4px;
+}
+.itb-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.item-text-inp{
+  flex:1;min-width:0;font-size:13px;border:.5px solid var(--bd);border-radius:8px;
+  padding:6px 10px;font-family:inherit;color:var(--tp);background:var(--sf2);outline:none;
+  transition:border-color .15s;resize:none;overflow:hidden;line-height:1.55;min-height:34px;
+}
+.item-text-inp:focus{border-color:var(--ac)}
+.item-text-inp::placeholder{color:var(--tm)}
+.item-del-btn{background:none;border:none;cursor:pointer;color:var(--tm);font-size:16px;padding:3px;flex-shrink:0;margin-top:5px}
+.item-del-btn:hover{color:#c0392b}
+.add-row-btn{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--tm);cursor:pointer;padding:7px 0;background:none;border:none;font-family:inherit;border-top:.5px dashed var(--bd2);margin-top:2px;width:100%}
+.add-row-btn:hover{color:var(--ac)}
+.btn-row{display:flex;gap:8px;align-items:center;margin-top:14px;padding-top:12px;border-top:.5px solid var(--bd)}
+.btn-del{margin-right:auto;background:none;border:.5px solid #e8b4b4;color:#c0392b;font-size:12px;padding:7px 12px;border-radius:var(--r);cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px;transition:background .12s}
+.btn-del:hover{background:#fdf0f0}
+.btn-cancel{background:none;border:.5px solid var(--bd2);color:var(--ts);font-size:13px;padding:8px 16px;border-radius:var(--r);cursor:pointer;font-family:inherit;transition:background .12s}
+.btn-cancel:hover{background:var(--sf2)}
+.btn-save{background:var(--ac);border:none;color:#fff;font-size:13px;padding:8px 18px;border-radius:var(--r);cursor:pointer;font-family:inherit;font-weight:500;transition:opacity .12s}
+.btn-save:hover{opacity:.88}
+
+/* tag picker dropdown */
+.tp-drop{position:fixed;background:var(--surface);border:.5px solid var(--bd2);border-radius:var(--r);box-shadow:0 4px 20px rgba(0,0,0,.15);z-index:200;padding:6px;display:none;flex-direction:column;gap:3px;min-width:120px}
+.tp-opt{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:500;color:var(--tp)}
+.tp-opt:hover{background:var(--sf2)}
+.tp-opt.sel{background:var(--acbg)}
+.tp-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.tp-mgr{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:7px;cursor:pointer;font-size:11px;color:var(--tm);border-top:.5px solid var(--bd);margin-top:2px}
+.tp-mgr:hover{background:var(--sf2);color:var(--ac)}
+
+/* tag manager modal */
+.mgr{background:var(--surface);border:.5px solid var(--bd2);border-radius:14px;padding:1.5rem;width:340px;max-width:94vw;box-shadow:0 8px 40px rgba(0,0,0,.18);animation:pop .18s ease-out}
+.mgr-title{font-size:16px;font-weight:600;margin-bottom:14px}
+.mgr-list{display:flex;flex-direction:column;gap:7px;margin-bottom:16px;max-height:160px;overflow-y:auto}
+.mgr-row{display:flex;align-items:center;gap:8px}
+.mgr-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.mgr-name{flex:1;font-size:13px;color:var(--tp)}
+.mgr-del{background:none;border:none;cursor:pointer;color:var(--tm);font-size:15px;padding:2px 5px}
+.mgr-del:hover{color:#c0392b}
+.mgr-add-row{display:flex;gap:8px;margin-bottom:10px}
+.mgr-inp{flex:1;font-size:13px;border:.5px solid var(--bd2);border-radius:var(--r);padding:8px 10px;font-family:inherit;color:var(--tp);background:var(--sf2);outline:none}
+.mgr-inp:focus{border-color:var(--ac)}
+.mgr-add{background:var(--ac);border:none;color:#fff;font-size:13px;padding:8px 14px;border-radius:var(--r);cursor:pointer;font-family:inherit;font-weight:500;white-space:nowrap}
+.pal-row{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+.pal-d{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .12s,border-color .12s;flex-shrink:0}
+.pal-d:hover{transform:scale(1.15)}.pal-d.pk{border-color:var(--tp);transform:scale(1.1)}
+
+/* ── Summary panel ── */
+.sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:.25rem}
+.sm-lbl{font-size:20px;font-weight:600}
+.sm-hint{font-size:12px;color:var(--tm);margin-top:2px}
+.sm-nav{display:flex;gap:6px}
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:1rem}
+.sb{background:var(--surface);border:.5px solid var(--bd);border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh)}
+.sb.full{grid-column:1/-1}
+.sb-lbl{font-size:11px;color:var(--tm);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.sb-lbl i{font-size:14px}
+.sta{width:100%;border:none;background:none;font-family:inherit;font-size:13px;color:var(--tp);line-height:1.7;resize:none;outline:none;min-height:80px}
+.sta.big{min-height:120px}.sta::placeholder{color:var(--tm)}
+.stars{display:flex;gap:6px;margin-top:4px}
+.star{font-size:22px;cursor:pointer;background:none;border:none;color:var(--bd2);transition:color .12s,transform .1s;line-height:1;padding:0}
+.star.lit{color:#f0a500}.star:hover{transform:scale(1.2)}
+.save-hint{font-size:12px;color:var(--tm);opacity:0;transition:opacity .4s}
+.save-hint.on{opacity:1}
+.wc{font-size:11px;color:var(--tm);text-align:right;margin-top:4px}
+
+/* ── Cloud sync modal ── */
+.cloud-modal{background:var(--surface);border:.5px solid var(--bd2);border-radius:14px;padding:1.5rem;width:400px;max-width:95vw;box-shadow:0 8px 40px rgba(0,0,0,.18);animation:pop .18s ease-out}
+.cloud-title{font-size:16px;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.cloud-desc{font-size:12px;color:var(--tm);line-height:1.7;margin-bottom:16px}
+.cloud-desc a{color:var(--ac);text-decoration:none}.cloud-desc a:hover{text-decoration:underline}
+.cloud-steps{counter-reset:step;display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.cloud-step{display:flex;gap:10px;align-items:flex-start;font-size:12px;color:var(--ts)}
+.cloud-step-n{width:20px;height:20px;border-radius:50%;background:var(--acbg);color:var(--ac);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.cloud-step-text{flex:1;line-height:1.6;padding-top:1px}
+.cloud-step-text b{color:var(--tp);font-weight:600}
+.cloud-field{margin-bottom:10px}
+.cloud-label{font-size:11px;color:var(--tm);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px}
+.cloud-inp{width:100%;font-size:13px;border:.5px solid var(--bd2);border-radius:var(--r);padding:9px 12px;font-family:inherit;color:var(--tp);background:var(--sf2);outline:none;transition:border-color .15s}
+.cloud-inp:focus{border-color:var(--ac)}
+.cloud-inp::placeholder{color:var(--tm)}
+.cloud-row{display:flex;gap:8px;margin-bottom:12px}
+.cloud-status{font-size:12px;padding:8px 12px;border-radius:var(--r);margin-bottom:12px;display:flex;align-items:center;gap:7px;min-height:36px}
+.cloud-status.ok{background:#eaf7ee;color:#2e7d32}
+.cloud-status.err{background:#fdf0f0;color:#c0392b}
+.cloud-status.ing{background:var(--sf2);color:var(--tm)}
+[data-theme="dark"] .cloud-status.ok{background:#1a2e1b;color:#81c784}
+[data-theme="dark"] .cloud-status.err{background:#3b0a0a;color:#ef9a9a}
+.cloud-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.cloud-btn{font-size:12px;padding:7px 14px;border-radius:var(--r);cursor:pointer;font-family:inherit;border:.5px solid var(--bd2);background:var(--sf2);color:var(--ts);transition:all .12s;display:flex;align-items:center;gap:5px}
+.cloud-btn:hover{background:var(--surface);border-color:var(--ac);color:var(--ac)}
+.cloud-btn.primary{background:var(--ac);border-color:var(--ac);color:#fff}
+.cloud-btn.primary:hover{opacity:.85}
+.cloud-sep{height:.5px;background:var(--bd);margin:14px 0}
+.cloud-user{display:flex;align-items:center;gap:10px;background:var(--sf2);border-radius:var(--r);padding:10px 12px;margin-bottom:12px}
+.cloud-avatar{width:36px;height:36px;border-radius:50%;background:var(--acbg);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600;color:var(--ac);flex-shrink:0}
+.cloud-user-info{flex:1;min-width:0}
+.cloud-user-name{font-size:13px;font-weight:500;color:var(--tp)}
+.cloud-user-sub{font-size:11px;color:var(--tm);margin-top:1px}
+.sync-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;position:absolute;top:6px;right:6px}
+.ib{position:relative}
+.sync-dot.ok{background:#4caf50}
+.sync-dot.err{background:#f44336}
+.sync-dot.ing{background:#ff9800;animation:pulse .8s infinite alternate}
+@keyframes pulse{from{opacity:.4}to{opacity:1}}
+
+/* ── print ── */
+@media print{
+  body{background:#fff;padding:.8cm;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .top-bar,.tab-bar,.sel-bar,.legend,.theme-block,.stats-row,.todo-aside,.ov{display:none!important}
+  .panel{display:block!important}#panel-sum{display:none!important}
+  .cal-layout{display:block}
+  .dc{min-height:70px;box-shadow:none!important}
+  .app{max-width:100%}@page{margin:.8cm;size:A4 landscape}
+}
+@media(max-width:700px){
+  .cal-layout{grid-template-columns:1fr}
+  .todo-aside{position:static}
+  .sg{grid-template-columns:1fr}.sb.full{grid-column:1}
+}
+@media(max-width:500px){.dc{min-height:50px}.day-items{display:none}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<div class="top-bar">
+  <div class="top-title">月计划表</div>
+  <div class="top-acts">
+    <button class="ib" id="sel-btn" onclick="toggleSelMode()" title="多选日期·设置背景色"><i class="ti ti-paint"></i></button>
+    <button class="ib" onclick="openCloud()" title="云端同步" id="cloud-btn"><i class="ti ti-cloud"></i></button>
+    <button class="ib" onclick="toggleTheme()" title="切换主题"><i class="ti ti-moon-stars" id="theme-icon"></i></button>
+    <button class="ib" onclick="window.print()" title="下载 PDF"><i class="ti ti-file-type-pdf"></i></button>
+  </div>
+</div>
+
+<div class="tab-bar">
+  <button class="tab-btn on" id="tab-cal" onclick="switchTab('cal')"><i class="ti ti-calendar" style="font-size:13px;margin-right:5px"></i>日历计划</button>
+  <button class="tab-btn"    id="tab-sum" onclick="switchTab('sum')"><i class="ti ti-notebook" style="font-size:13px;margin-right:5px"></i>月总结</button>
+</div>
+
+<!-- ── Calendar panel ── -->
+<div class="panel on" id="panel-cal">
+  <div class="cal-layout">
+
+    <!-- left: calendar -->
+    <div class="cal-main">
+      <div class="mnav">
+        <div><div class="mlabel" id="cal-mlabel"></div><div class="msub" id="cal-msub"></div></div>
+        <div class="mnav-btns">
+          <button class="ib" onclick="prevMonth()"><i class="ti ti-chevron-left"></i></button>
+          <button class="ib" onclick="goToday()" title="回到今天"><i class="ti ti-calendar-event"></i></button>
+          <button class="ib" onclick="nextMonth()"><i class="ti ti-chevron-right"></i></button>
+        </div>
+      </div>
+      <div class="sel-bar" id="sel-bar">
+        <span class="sb-lbl">背景色</span>
+        <div class="swatches" id="swatches"></div>
+        <div class="sb-div"></div>
+        <span class="sb-cnt" id="sel-cnt">已选 0 天</span>
+        <button class="sb-clear" onclick="clearSel()">取消选择</button>
+      </div>
+      <div class="wk-row">
+        <div class="wk-lbl">日</div><div class="wk-lbl">一</div><div class="wk-lbl">二</div>
+        <div class="wk-lbl">三</div><div class="wk-lbl">四</div><div class="wk-lbl">五</div><div class="wk-lbl">六</div>
+      </div>
+      <div class="day-grid" id="grid"
+        onmousedown="gMD(event)" onmouseover="gMO(event)" onmouseup="gMU()"></div>
+      <div class="legend" id="legend"></div>
+      <div class="theme-block">
+        <div class="sec-lbl"><i class="ti ti-bulb"></i>本月主题</div>
+        <textarea class="plain-ta" id="cal-theme" placeholder="用几个词概括这个月的主题…" oninput="autoSaveTheme()"></textarea>
+      </div>
+      <div class="stats-row" id="stats-row"></div>
+    </div>
+
+    <!-- right: todo aside -->
+    <div class="todo-aside">
+      <div class="todo-title"><i class="ti ti-checklist" style="font-size:16px"></i>本月待办</div>
+      <div class="todo-month" id="todo-month-lbl"></div>
+      <div class="todo-add-row">
+        <input class="todo-inp" id="todo-inp" type="text" placeholder="添加一件待办事项…" maxlength="60"
+          onkeydown="if(event.key==='Enter')addTodo()">
+        <button class="todo-add-btn" onclick="addTodo()" title="添加"><i class="ti ti-plus"></i></button>
+      </div>
+      <div class="todo-list" id="todo-list"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Summary panel ── -->
+<div class="panel" id="panel-sum">
+  <div class="sh">
+    <div><div class="sm-lbl" id="sum-mlabel"></div><div class="sm-hint">与日历同步月份 · 自动保存</div></div>
+    <div class="sm-nav">
+      <button class="ib" onclick="prevMonth()"><i class="ti ti-chevron-left"></i></button>
+      <button class="ib" onclick="nextMonth()"><i class="ti ti-chevron-right"></i></button>
+    </div>
+  </div>
+  <div class="sg">
+    <div class="sb full"><div class="sb-lbl"><i class="ti ti-star"></i>本月评分</div><div class="stars" id="stars"></div></div>
+    <div class="sb full"><div class="sb-lbl"><i class="ti ti-bulb"></i>本月关键词 / 主题</div><textarea class="sta" id="sum-kw" rows="2" placeholder="用几个词概括这个月…" oninput="autoSaveSummary()"></textarea></div>
+    <div class="sb"><div class="sb-lbl"><i class="ti ti-thumb-up"></i>做得好的事</div><textarea class="sta big" id="sum-good" placeholder="记录本月的高光时刻…" oninput="autoSaveSummary()"></textarea></div>
+    <div class="sb"><div class="sb-lbl"><i class="ti ti-refresh-alert"></i>可以改进的地方</div><textarea class="sta big" id="sum-improve" placeholder="复盘不足，下月优化…" oninput="autoSaveSummary()"></textarea></div>
+    <div class="sb full"><div class="sb-lbl"><i class="ti ti-heart"></i>印象最深的瞬间</div><textarea class="sta" id="sum-moment" placeholder="某个让你停下来的时刻…" oninput="autoSaveSummary()"></textarea></div>
+    <div class="sb full"><div class="sb-lbl"><i class="ti ti-arrow-right"></i>下个月的一个小目标</div><textarea class="sta" id="sum-next" placeholder="只写一件最重要的事…" oninput="autoSaveSummary()"></textarea></div>
+    <div class="sb full">
+      <div class="sb-lbl"><i class="ti ti-pencil"></i>自由书写</div>
+      <textarea class="sta big" id="sum-free" style="min-height:150px" placeholder="任何想说的话…" oninput="updateWC();autoSaveSummary()"></textarea>
+      <div class="wc" id="wc">0 字</div>
+    </div>
+  </div>
+  <div style="margin-top:1rem"><span class="save-hint" id="save-hint"><i class="ti ti-check" style="font-size:12px"></i> 已保存</span></div>
+</div>
+
+<!-- ── Cloud sync modal ── -->
+<div class="ov" id="cloud-ov" onclick="if(event.target===this)closeCloud()">
+  <div class="cloud-modal">
+    <div class="cloud-title"><i class="ti ti-cloud" style="font-size:18px"></i>云端同步</div>
+
+    <!-- setup view -->
+    <div id="cloud-setup">
+      <p class="cloud-desc">用你的 GitHub 账号同步数据，免费，国内可访问。只需填入 Token，所有设备用同一个 Token 即可同步。</p>
+      <div class="cloud-field">
+        <div class="cloud-label">GitHub 用户名</div>
+        <input class="cloud-inp" id="gh-user" placeholder="例如 shiny1177" autocomplete="off" value="shiny1177">
+      </div>
+      <div class="cloud-field">
+        <div class="cloud-label">Personal Access Token（ghp_ 开头，不要泄露）</div>
+        <input class="cloud-inp" id="gh-token" type="password" placeholder="ghp_xxxxxxxxxxxxxxxx" autocomplete="off">
+      </div>
+      <div id="cloud-status-setup" class="cloud-status" style="display:none"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+        <button class="btn-cancel" onclick="closeCloud()">取消</button>
+        <button class="cloud-btn primary" onclick="connectGH()"><i class="ti ti-plug" style="font-size:13px"></i> 连接并同步</button>
+      </div>
+    </div>
+
+    <!-- connected view -->
+    <div id="cloud-connected" style="display:none">
+      <div class="cloud-user">
+        <div class="cloud-avatar"><i class="ti ti-brand-github" style="font-size:18px"></i></div>
+        <div class="cloud-user-info">
+          <div class="cloud-user-name" id="cloud-user-name">已连接 GitHub</div>
+          <div class="cloud-user-sub" id="cloud-user-sub">数据变动后自动同步</div>
+        </div>
+      </div>
+      <div id="cloud-status" class="cloud-status ok" style="display:flex"><i class="ti ti-check" style="font-size:14px"></i>已连接，数据变动后3秒自动同步</div>
+      <div class="cloud-actions">
+        <button class="cloud-btn" onclick="cloudPush(true)"><i class="ti ti-upload" style="font-size:13px"></i> 立即上传</button>
+        <button class="cloud-btn" onclick="cloudPull(true)"><i class="ti ti-download" style="font-size:13px"></i> 从云端还原</button>
+      </div>
+      <div class="cloud-sep"></div>
+      <p style="font-size:12px;color:var(--tm);margin-bottom:12px;line-height:1.7">在新设备打开月计划表 → 点云图标 → 填入同一个 GitHub 用户名和 Token → 连接，数据自动同步。</p>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <button class="cloud-btn" style="color:#c0392b;border-color:#e8b4b4" onclick="disconnectCloud()"><i class="ti ti-unlink" style="font-size:13px"></i> 断开同步</button>
+        <button class="btn-cancel" onclick="closeCloud()">关闭</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- .app -->
+
+<!-- Note modal -->
+<div class="ov" id="note-ov" onclick="if(event.target===this)closeNote()">
+  <div class="modal">
+    <div class="modal-date" id="note-date"></div>
+    <div class="modal-title">编辑计划</div>
+    <div class="msec">逐条记录 <span style="font-weight:400;font-size:10px;text-transform:none;letter-spacing:0;color:var(--tm)">每行一件事，点标签切换分类</span></div>
+    <div class="items-list" id="items-list"></div>
+    <button class="add-row-btn" onclick="addRow()"><i class="ti ti-plus" style="font-size:13px"></i> 添加一行</button>
+    <div class="btn-row">
+      <button class="btn-del" id="note-del" onclick="deleteNote()"><i class="ti ti-trash" style="font-size:13px"></i> 清空</button>
+      <button class="btn-cancel" onclick="closeNote()">取消</button>
+      <button class="btn-save" onclick="saveNote()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Tag picker dropdown -->
+<div class="tp-drop" id="tp-drop">
+  <div id="tp-opts"></div>
+  <div class="tp-mgr" onclick="openMgr()"><i class="ti ti-settings" style="font-size:12px"></i> 管理分类</div>
+</div>
+
+<!-- Tag manager modal -->
+<div class="ov" id="mgr-ov" onclick="if(event.target===this)closeMgr()">
+  <div class="mgr">
+    <div class="mgr-title">管理标签分类</div>
+    <div class="msec" style="margin-bottom:8px">已有分类</div>
+    <div class="mgr-list" id="mgr-list"></div>
+    <div class="msec" style="margin-bottom:8px">添加新分类</div>
+    <div class="mgr-add-row">
+      <input class="mgr-inp" id="new-tag-name" type="text" placeholder="分类名称，最多6字" maxlength="6">
+      <button class="mgr-add" onclick="addTag()">添加</button>
+    </div>
+    <div class="pal-row" id="pal-row"></div>
+    <div style="display:flex;justify-content:flex-end">
+      <button class="btn-cancel" onclick="closeMgr()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Constants ───────────────────────────────────────────────────────────
+const MN  = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+const WDS = ['周日','周一','周二','周三','周四','周五','周六'];
+const SUM_IDS = ['kw','good','improve','moment','next','free'];
+const BG_COLORS = [
+  {id:'rose',L:'#fce4ec',D:'#3b1a22',n:'玫瑰'},{id:'amber',L:'#fff8e1',D:'#3a2800',n:'琥珀'},
+  {id:'lime',L:'#f1f8e9',D:'#1a2e0a',n:'草绿'},{id:'sky',L:'#e1f5fe',D:'#0a2535',n:'天蓝'},
+  {id:'violet',L:'#ede7f6',D:'#1e1040',n:'紫罗兰'},{id:'peach',L:'#fbe9e7',D:'#3a1510',n:'蜜桃'},
+  {id:'mint',L:'#e0f2f1',D:'#0a2420',n:'薄荷'},{id:'slate',L:'#eceff1',D:'#1c2226',n:'石板'},
+];
+const PAL = [
+  {L:'#185FA5',B:'#ddeaf9',dL:'#7bb3e8',dB:'#1a2d45'},{L:'#2e7d32',B:'#dcedc8',dL:'#81c784',dB:'#1a2e1b'},
+  {L:'#7b1fa2',B:'#f3e5f5',dL:'#ce93d8',dB:'#2a1040'},{L:'#bf360c',B:'#fce4d6',dL:'#ff8a65',dB:'#3c1a0e'},
+  {L:'#e65100',B:'#fff3e0',dL:'#ffb74d',dB:'#3d2000'},{L:'#00695c',B:'#e0f2f1',dL:'#4db6ac',dB:'#0a2420'},
+  {L:'#c62828',B:'#ffebee',dL:'#ef9a9a',dB:'#3b0a0a'},{L:'#4527a0',B:'#ede7f6',dL:'#b39ddb',dB:'#1e1040'},
+  {L:'#558b2f',B:'#f1f8e9',dL:'#aed581',dB:'#1a2e0a'},{L:'#6d4c41',B:'#efebe9',dL:'#bcaaa4',dB:'#2a1a14'},
+  {L:'#37474f',B:'#eceff1',dL:'#90a4ae',dB:'#1c2226'},{L:'#ad1457',B:'#fce4ec',dL:'#f48fb1',dB:'#3b0a22'},
+];
+const DEFAULT_TAGS = [
+  {id:'career',label:'事业',L:'#185FA5',B:'#ddeaf9',dL:'#7bb3e8',dB:'#1a2d45'},
+  {id:'health',label:'健康',L:'#2e7d32',B:'#dcedc8',dL:'#81c784',dB:'#1a2e1b'},
+  {id:'fun',   label:'娱乐',L:'#7b1fa2',B:'#f3e5f5',dL:'#ce93d8',dB:'#2a1040'},
+];
+
+// ─── State ───────────────────────────────────────────────────────────────
+let TAGS      = JSON.parse(localStorage.getItem('mpl-tags')      || 'null') || DEFAULT_TAGS;
+let notes     = JSON.parse(localStorage.getItem('mpl-notes')     || '{}');
+let summaries = JSON.parse(localStorage.getItem('mpl-summaries') || '{}');
+let dayBg     = JSON.parse(localStorage.getItem('mpl-daybg')     || '{}');
+let todos     = JSON.parse(localStorage.getItem('mpl-todos')     || '{}');
+
+const today  = new Date();
+let cur      = new Date(today.getFullYear(), today.getMonth(), 1);
+let editDay  = null;
+let rowItems = [];
+let selMode  = false, selDays = new Set(), activeBg = null;
+let dragging = false, dragAdd = true;
+let openPickerRow = null;
+let pickedPal = 0;
+
+// ─── Persist ─────────────────────────────────────────────────────────────
+const saveTags  = () => { localStorage.setItem('mpl-tags',      JSON.stringify(TAGS));      scheduleSync(); };
+const saveNotes = () => { localStorage.setItem('mpl-notes',     JSON.stringify(notes));     scheduleSync(); };
+const saveSums  = () => { localStorage.setItem('mpl-summaries', JSON.stringify(summaries)); scheduleSync(); };
+const saveBg    = () => { localStorage.setItem('mpl-daybg',     JSON.stringify(dayBg));     scheduleSync(); };
+const saveTodos = () => { localStorage.setItem('mpl-todos',     JSON.stringify(todos));     scheduleSync(); };
+
+const nk   = (y,m,d) => `${y}-${m+1}-${d}`;
+const mk   = (y,m)   => `${y}-${m+1}`;
+const dark = ()      => document.documentElement.getAttribute('data-theme')==='dark';
+const tC   = t       => dark() ? t.dL : t.L;
+const tB   = t       => dark() ? t.dB : t.B;
+const bgV  = id      => { const c=BG_COLORS.find(b=>b.id===id); return c?(dark()?c.D:c.L):null; };
+const esc  = s       => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+// ─── Theme ───────────────────────────────────────────────────────────────
+function toggleTheme() {
+  const n = dark()?'light':'dark';
+  document.documentElement.setAttribute('data-theme', n);
+  document.getElementById('theme-icon').className = n==='dark'?'ti ti-sun':'ti ti-moon-stars';
+  renderSwatches(); render(); renderTodos();
+}
+
+// ─── Tab (shared month) ───────────────────────────────────────────────────
+let curTab = 'cal';
+function switchTab(t) {
+  curTab = t;
+  ['cal','sum'].forEach(id=>{
+    document.getElementById('panel-'+id).classList.toggle('on',id===t);
+    document.getElementById('tab-'+id).classList.toggle('on',id===t);
+  });
+  if (t==='cal') { render(); loadTheme(); renderTodos(); }
+  else           renderSummary();
+}
+
+// ─── Month nav (shared) ───────────────────────────────────────────────────
+function prevMonth() { cur=new Date(cur.getFullYear(),cur.getMonth()-1,1); refresh(); }
+function nextMonth() { cur=new Date(cur.getFullYear(),cur.getMonth()+1,1); refresh(); }
+function goToday()   { cur=new Date(today.getFullYear(),today.getMonth(),1); refresh(); }
+function refresh() {
+  if (curTab==='cal') { render(); loadTheme(); renderTodos(); }
+  else                renderSummary();
+}
+
+// ─── Select mode & drag ───────────────────────────────────────────────────
+function toggleSelMode() {
+  selMode=!selMode; selDays.clear(); activeBg=null;
+  document.getElementById('sel-btn').classList.toggle('on',selMode);
+  document.getElementById('sel-bar').classList.toggle('on',selMode);
+  updSelCnt(); render();
+}
+function updSelCnt() { document.getElementById('sel-cnt').textContent=`已选 ${selDays.size} 天`; }
+function dayFromEl(el) { const c=el.closest('[data-day]'); return c?+c.dataset.day:null; }
+function gMD(e) {
+  if(!selMode) return; const d=dayFromEl(e.target); if(!d) return;
+  e.preventDefault(); dragging=true;
+  const k=nk(cur.getFullYear(),cur.getMonth(),d);
+  dragAdd=!selDays.has(k); dragAdd?selDays.add(k):selDays.delete(k);
+  updSelCnt(); render();
+}
+function gMO(e) {
+  if(!selMode||!dragging) return; const d=dayFromEl(e.target); if(!d) return;
+  const k=nk(cur.getFullYear(),cur.getMonth(),d);
+  dragAdd?selDays.add(k):selDays.delete(k); updSelCnt(); render();
+}
+function gMU() { dragging=false; }
+document.addEventListener('mouseup',()=>{dragging=false;});
+
+function applyBg(id) {
+  activeBg=activeBg===id?null:id;
+  selDays.forEach(k=>{ if(activeBg) dayBg[k]=activeBg; else delete dayBg[k]; });
+  saveBg(); renderSwatches(); render();
+}
+function clearCellBg() { selDays.forEach(k=>delete dayBg[k]); saveBg(); render(); }
+function clearSel() { selDays.clear(); activeBg=null; updSelCnt(); render(); }
+
+function renderSwatches() {
+  document.getElementById('swatches').innerHTML=
+    BG_COLORS.map(c=>`<div class="sw${activeBg===c.id?' act':''}"
+      style="background:${dark()?c.D:c.L};border-color:${activeBg===c.id?'var(--tp)':'transparent'}"
+      title="${c.n}" onclick="applyBg('${c.id}')"></div>`).join('')+
+    `<div class="sw clr" title="清除背景色" onclick="clearCellBg()"><i class="ti ti-x" style="font-size:11px"></i></div>`;
+}
+
+// ─── Calendar render ──────────────────────────────────────────────────────
+function renderStats() {
+  const y=cur.getFullYear(),m=cur.getMonth(),days=new Date(y,m+1,0).getDate();
+  let total=0, tc={};
+  for(let d=1;d<=days;d++){
+    const rows=notes[nk(y,m,d)];
+    if(rows&&rows.length){total++;rows.forEach(r=>{if(r.tag)tc[r.tag]=(tc[r.tag]||0)+1;});}
+  }
+  const topId=Object.keys(tc).sort((a,b)=>tc[b]-tc[a])[0];
+  const topT=topId?TAGS.find(t=>t.id===topId):null;
+  document.getElementById('stats-row').innerHTML=`
+    <div class="stat-card"><div class="slbl">已记录</div><div class="sval">${total}</div></div>
+    <div class="stat-card"><div class="slbl">本月天数</div><div class="sval">${days}</div></div>
+    <div class="stat-card"><div class="slbl">最多分类</div><div class="sval" style="font-size:13px;padding-top:3px">${topT
+      ?`<span class="chip" style="color:${tC(topT)};background:${tB(topT)}">${topT.label} ×${tc[topId]}</span>`
+      :'<span style="color:var(--tm);font-size:18px">—</span>'}</div></div>`;
+}
+
+function renderLegend() {
+  document.getElementById('legend').innerHTML=
+    TAGS.map(t=>`<div class="leg-item"><div class="leg-dot" style="background:${tC(t)}"></div>${t.label}</div>`).join('')+
+    `<div class="leg-item" style="margin-left:auto;font-style:italic">${selMode?'拖动可批量选中':'点击日期添加计划'}</div>`;
+}
+
+function render() {
+  const y=cur.getFullYear(),m=cur.getMonth();
+  document.getElementById('cal-mlabel').textContent=`${y}年 ${MN[m]}`;
+  document.getElementById('cal-msub').textContent=`${y}年第${m+1}个月 · ${new Date(y,m+1,0).getDate()}天`;
+
+  // 先渲染格子，保证月份切换时日期始终正确
+  const first=new Date(y,m,1).getDay(), days=new Date(y,m+1,0).getDate();
+  let html='';
+  for(let i=0;i<first;i++) html+=`<div class="dc empty"></div>`;
+  for(let d=1;d<=days;d++){
+    const k=nk(y,m,d), rows=notes[k]||[], dow=(first+d-1)%7;
+    const isToday=today.getFullYear()===y&&today.getMonth()===m&&today.getDate()===d;
+    const isWknd=dow===0||dow===6, isSel=selDays.has(k), bgId=dayBg[k];
+    const bgStyle=bgId?`background:${bgV(bgId)};`:'';
+    const click=selMode?'':` onclick="openNote(${d})"`;
+    const itemsHtml=rows.map(row=>{
+      const t=row.tag?TAGS.find(x=>x.id===row.tag):null;
+      return `<div class="day-item-line">
+        ${t?`<span class="di-chip" style="color:${tC(t)};background:${tB(t)}">${t.label}</span>`:''}
+        <span class="di-text">${esc(row.text||'')}</span>
+      </div>`;
+    }).join('');
+    html+=`<div class="dc${isToday?' today':''}${rows.length?' has-note':''}${isWknd?' wknd':''}${selMode?' sel-mode':''}${isSel?' picked':''}"
+      data-day="${d}" style="${bgStyle}"${click} role="button" aria-label="${m+1}月${d}日">
+      <div class="dnum">${d}</div>
+      <div class="day-items">${itemsHtml}</div>
+    </div>`;
+  }
+  document.getElementById('grid').innerHTML=html;
+
+  // 再渲染辅助区域
+  try{renderStats();}catch(e){console.warn('renderStats',e);}
+  try{renderLegend();}catch(e){console.warn('renderLegend',e);}
+  try{renderSwatches();}catch(e){console.warn('renderSwatches',e);}
+}
+
+// ─── Note modal ───────────────────────────────────────────────────────────
+function openNote(d) {
+  editDay=d;
+  const y=cur.getFullYear(),m=cur.getMonth(),k=nk(y,m,d);
+  const dow=new Date(y,m,d).getDay();
+  const existing=notes[k];
+  rowItems=existing&&existing.length
+    ?existing.map(r=>({tag:r.tag||null,text:r.text||''}))
+    :[{tag:TAGS[0]?TAGS[0].id:null,text:''}];
+  document.getElementById('note-date').textContent=`${WDS[dow]} · ${y}年${m+1}月${d}日`;
+  document.getElementById('note-del').style.display=existing&&existing.length?'':'none';
+  renderRows();
+  document.getElementById('note-ov').classList.add('on');
+  setTimeout(()=>{const f=document.querySelector('.item-text-inp');if(f)f.focus();},80);
+}
+
+function renderRows() {
+  document.getElementById('items-list').innerHTML=rowItems.map((r,i)=>{
+    const t=r.tag?TAGS.find(x=>x.id===r.tag):null;
+    const color=t?tC(t):'var(--tm)', bg=t?tB(t):'var(--sf2)';
+    return `<div class="item-row" data-row="${i}"
+      draggable="true"
+      ondragstart="rowDragStart(event,${i})"
+      ondragover="rowDragOver(event,${i})"
+      ondrop="rowDrop(event,${i})"
+      ondragleave="rowDragLeave(event)"
+      ondragend="rowDragEnd()">
+      <span class="drag-handle" title="拖动排序"><i class="ti ti-grip-vertical"></i></span>
+      <button class="item-tag-btn" style="color:${color};border-color:${color};background:${bg}"
+        onclick="openPicker(${i},this)">
+        <span class="itb-dot" style="background:${color}"></span>
+        ${t?t.label:'无'}
+        <i class="ti ti-chevron-down" style="font-size:10px;opacity:.7"></i>
+      </button>
+      <textarea class="item-text-inp" placeholder="记录这件事…"
+        oninput="rowItems[${i}].text=this.value;autoResizeTA(this)"
+        onkeydown="rowKD(event,${i})"
+        rows="1">${esc(r.text)}</textarea>
+      <button class="item-del-btn" onclick="removeRow(${i})" style="margin-top:6px"><i class="ti ti-x"></i></button>
+    </div>`;
+  }).join('');
+  // auto-resize all textareas after render
+  document.querySelectorAll('.item-text-inp').forEach(autoResizeTA);
+}
+
+function autoResizeTA(el) {
+  el.style.height='auto';
+  el.style.height=el.scrollHeight+'px';
+}
+
+function addRow() {
+  rowItems.push({tag:TAGS[0]?TAGS[0].id:null,text:''});
+  renderRows();
+  const ins=document.querySelectorAll('.item-text-inp');
+  if(ins.length) ins[ins.length-1].focus();
+}
+function removeRow(i) {
+  rowItems.splice(i,1);
+  if(!rowItems.length) rowItems=[{tag:TAGS[0]?TAGS[0].id:null,text:''}];
+  renderRows();
+}
+function rowKD(e,i) {
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addRow();}
+}
+
+// ─── Drag-to-reorder rows ────────────────────────────────────────────────
+let dragSrcIdx=null;
+function rowDragStart(e,i) {
+  dragSrcIdx=i;
+  e.dataTransfer.effectAllowed='move';
+  setTimeout(()=>document.querySelectorAll('.item-row')[i]?.classList.add('dragging'),0);
+}
+function rowDragOver(e,i) {
+  e.preventDefault(); e.dataTransfer.dropEffect='move';
+  document.querySelectorAll('.item-row').forEach((r,idx)=>r.classList.toggle('drag-over',idx===i&&idx!==dragSrcIdx));
+}
+function rowDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+function rowDrop(e,i) {
+  e.preventDefault();
+  if(dragSrcIdx===null||dragSrcIdx===i) return;
+  const moved=rowItems.splice(dragSrcIdx,1)[0];
+  rowItems.splice(i,0,moved);
+  dragSrcIdx=null;
+  renderRows();
+}
+function rowDragEnd() {
+  dragSrcIdx=null;
+  document.querySelectorAll('.item-row').forEach(r=>r.classList.remove('dragging','drag-over'));
+}
+
+function closeNote() { document.getElementById('note-ov').classList.remove('on'); closePicker(); }
+
+function saveNote() {
+  const k=nk(cur.getFullYear(),cur.getMonth(),editDay);
+  const filtered=rowItems.filter(r=>r.text.trim()||r.tag);
+  if(filtered.length) notes[k]=filtered.map(r=>({tag:r.tag,text:r.text.trim()}));
+  else delete notes[k];
+  saveNotes(); closeNote(); render();
+}
+function deleteNote() {
+  delete notes[nk(cur.getFullYear(),cur.getMonth(),editDay)];
+  saveNotes(); closeNote(); render();
+}
+
+// ─── Tag picker ───────────────────────────────────────────────────────────
+function openPicker(rowIdx, btn) {
+  if(openPickerRow===rowIdx && document.getElementById('tp-drop').style.display==='flex'){closePicker();return;}
+  openPickerRow=rowIdx;
+  const drop=document.getElementById('tp-drop');
+  document.getElementById('tp-opts').innerHTML=TAGS.map(t=>`
+    <div class="tp-opt${rowItems[rowIdx].tag===t.id?' sel':''}" onclick="pickTag(${rowIdx},'${t.id}')">
+      <div class="tp-dot" style="background:${tC(t)}"></div>${t.label}
+    </div>`).join('');
+  const rect=btn.getBoundingClientRect();
+  drop.style.cssText=`display:flex;flex-direction:column;top:${rect.bottom+6}px;left:${rect.left}px`;
+}
+function pickTag(rowIdx,tagId) { rowItems[rowIdx].tag=tagId; closePicker(); renderRows(); }
+function closePicker() { document.getElementById('tp-drop').style.display='none'; openPickerRow=null; }
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.item-tag-btn')&&!e.target.closest('#tp-drop')) closePicker();
+});
+
+// ─── Tag manager ──────────────────────────────────────────────────────────
+function openMgr() {
+  closePicker(); renderMgrList(); renderPal();
+  document.getElementById('new-tag-name').value='';
+  document.getElementById('mgr-ov').classList.add('on');
+}
+function closeMgr() { document.getElementById('mgr-ov').classList.remove('on'); renderRows(); renderLegend(); }
+function renderMgrList() {
+  document.getElementById('mgr-list').innerHTML=TAGS.map((t,i)=>`
+    <div class="mgr-row">
+      <div class="mgr-dot" style="background:${tC(t)}"></div>
+      <span class="mgr-name">${t.label}</span>
+      ${TAGS.length>1?`<button class="mgr-del" onclick="removeTag(${i})"><i class="ti ti-x"></i></button>`:''}
+    </div>`).join('');
+}
+function removeTag(i) {
+  const id=TAGS[i].id; TAGS.splice(i,1); saveTags();
+  Object.values(notes).forEach(rows=>{ if(Array.isArray(rows)) rows.forEach(r=>{if(r.tag===id)r.tag=null;}); });
+  saveNotes(); rowItems.forEach(r=>{if(r.tag===id)r.tag=TAGS[0]?TAGS[0].id:null;});
+  renderMgrList(); render();
+}
+function renderPal() {
+  document.getElementById('pal-row').innerHTML=PAL.map((c,i)=>
+    `<div class="pal-d${pickedPal===i?' pk':''}" style="background:${dark()?c.dL:c.L}"
+      onclick="pickedPal=${i};renderPal()"></div>`).join('');
+}
+function addTag() {
+  const name=document.getElementById('new-tag-name').value.trim();
+  if(!name){document.getElementById('new-tag-name').focus();return;}
+  const p=PAL[pickedPal];
+  TAGS.push({id:'c_'+Date.now(),label:name,L:p.L,B:p.B,dL:p.dL,dB:p.dB});
+  saveTags(); document.getElementById('new-tag-name').value='';
+  renderMgrList(); renderLegend();
+}
+
+// ─── Month theme ──────────────────────────────────────────────────────────
+let thTimer=null;
+function loadTheme() {
+  const s=summaries[mk(cur.getFullYear(),cur.getMonth())]||{};
+  const el=document.getElementById('cal-theme'); if(el) el.value=s.calTheme||'';
+}
+function autoSaveTheme() {
+  clearTimeout(thTimer);
+  thTimer=setTimeout(()=>{
+    const key=mk(cur.getFullYear(),cur.getMonth());
+    if(!summaries[key]) summaries[key]={};
+    summaries[key].calTheme=document.getElementById('cal-theme').value;
+    saveSums();
+  },500);
+}
+
+// ─── TODO list ────────────────────────────────────────────────────────────
+function todoMk() { return mk(cur.getFullYear(),cur.getMonth()); }
+
+function addTodo() {
+  const inp=document.getElementById('todo-inp');
+  const text=inp.value.trim(); if(!text) return;
+  const key=todoMk();
+  if(!todos[key]) todos[key]=[];
+  todos[key].push({id:'t'+Date.now(), text, done:false});
+  saveTodos(); inp.value=''; renderTodos();
+}
+
+function toggleTodo(id) {
+  const key=todoMk(), list=todos[key]||[];
+  const item=list.find(t=>t.id===id); if(item) item.done=!item.done;
+  saveTodos(); renderTodos();
+}
+
+function deleteTodo(id) {
+  const key=todoMk();
+  todos[key]=(todos[key]||[]).filter(t=>t.id!==id);
+  saveTodos(); renderTodos();
+}
+
+function renderTodos() {
+  const y=cur.getFullYear(),m=cur.getMonth();
+  document.getElementById('todo-month-lbl').textContent=`${y}年${MN[m]}`;
+  const key=todoMk(), list=todos[key]||[];
+  const pending=list.filter(t=>!t.done), done=list.filter(t=>t.done);
+  const el=document.getElementById('todo-list');
+  if(!list.length){ el.innerHTML=`<div class="todo-empty">暂无待办，添加一件吧</div>`; return; }
+
+  let html='';
+  // pending items
+  pending.forEach(t=>{
+    html+=`<div class="todo-item">
+      <div class="todo-cb" onclick="toggleTodo('${t.id}')"><i class="ti ti-check"></i></div>
+      <div class="todo-text">${esc(t.text)}</div>
+      <button class="todo-del" onclick="deleteTodo('${t.id}')" title="删除"><i class="ti ti-x" style="font-size:12px"></i></button>
+    </div>`;
+  });
+  // done items
+  if(done.length){
+    html+=`<div class="todo-sep"></div><div class="todo-done-label">已完成 ${done.length}</div>`;
+    done.forEach(t=>{
+      html+=`<div class="todo-item">
+        <div class="todo-cb done" onclick="toggleTodo('${t.id}')"><i class="ti ti-check"></i></div>
+        <div class="todo-text done">${esc(t.text)}</div>
+        <button class="todo-del" onclick="deleteTodo('${t.id}')" title="删除"><i class="ti ti-x" style="font-size:12px"></i></button>
+      </div>`;
+    });
+  }
+  el.innerHTML=html;
+}
+
+// ─── Summary ──────────────────────────────────────────────────────────────
+function renderSummary() {
+  const y=cur.getFullYear(),m=cur.getMonth();
+  document.getElementById('sum-mlabel').textContent=`${y}年 ${MN[m]}`;
+  const s=summaries[mk(y,m)]||{};
+  SUM_IDS.forEach(f=>{ const el=document.getElementById('sum-'+f); if(el) el.value=s[f]||''; });
+  const kw=document.getElementById('sum-kw');
+  if(kw&&!kw.value) kw.value=s.calTheme||'';
+  renderStars(s.rating||0); updateWC();
+}
+function renderStars(v) {
+  document.getElementById('stars').innerHTML=[1,2,3,4,5].map(i=>
+    `<button class="star${i<=v?' lit':''}" onclick="setRating(${i})">★</button>`).join('');
+}
+function setRating(n) {
+  const key=mk(cur.getFullYear(),cur.getMonth());
+  if(!summaries[key]) summaries[key]={};
+  summaries[key].rating=summaries[key].rating===n?0:n;
+  saveSums(); renderStars(summaries[key].rating);
+}
+let sumTimer=null;
+function autoSaveSummary() {
+  clearTimeout(sumTimer);
+  sumTimer=setTimeout(()=>{
+    const key=mk(cur.getFullYear(),cur.getMonth());
+    if(!summaries[key]) summaries[key]={};
+    SUM_IDS.forEach(f=>{ const el=document.getElementById('sum-'+f); if(el) summaries[key][f]=el.value; });
+    saveSums();
+    const h=document.getElementById('save-hint');
+    h.classList.add('on'); setTimeout(()=>h.classList.remove('on'),2000);
+  },600);
+}
+function updateWC() {
+  const el=document.getElementById('sum-free');
+  if(el) document.getElementById('wc').textContent=`${el.value.replace(/\s/g,'').length} 字`;
+}
+
+// ─── Cloud Sync (GitHub Gist) ──────────────────────────────────────────────
+let ghUser  = localStorage.getItem('mpl-gh-user')  || '';
+let ghToken = localStorage.getItem('mpl-gh-token') || '';
+let ghGist  = localStorage.getItem('mpl-gh-gist')  || '';
+let cloudTimer = null;
+
+const GIST_FILE = 'mpl-data.json';
+const GH_API    = 'https://api.github.com';
+
+function allData() { return { notes, summaries, dayBg, todos, TAGS }; }
+
+function applyData(d) {
+  if (!d) return;
+  if (d.notes)                 { notes=d.notes;         saveNotes(); }
+  if (d.summaries)             { summaries=d.summaries; saveSums();  }
+  if (d.dayBg)                 { dayBg=d.dayBg;         saveBg();    }
+  if (d.todos)                 { todos=d.todos;          saveTodos(); }
+  if (d.TAGS && d.TAGS.length) { TAGS=d.TAGS;            saveTags();  }
+}
+
+function ghHeaders() {
+  return { 'Authorization': 'Bearer ' + ghToken, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' };
+}
+
+function setSyncDot(state) {
+  const btn = document.getElementById('cloud-btn');
+  let dot = btn.querySelector('.sync-dot');
+  if (state==='off') { if(dot) dot.remove(); return; }
+  if (!dot) { dot=document.createElement('span'); dot.className='sync-dot'; btn.appendChild(dot); }
+  dot.className = 'sync-dot '+state;
+}
+
+function showStatus(id, msg, type='ing') {
+  const el=document.getElementById(id); if(!el) return;
+  el.style.display='flex'; el.className='cloud-status '+type;
+  const icon=type==='ok'?'ti-check':type==='err'?'ti-alert-circle':'ti-loader-2';
+  el.innerHTML=`<i class="ti ${icon}" style="font-size:14px"></i>${msg}`;
+}
+
+async function connectGH() {
+  const user  = document.getElementById('gh-user').value.trim();
+  const token = document.getElementById('gh-token').value.trim();
+  if (!user || !token) { showStatus('cloud-status-setup','请填写用户名和 Token','err'); return; }
+  showStatus('cloud-status-setup','连接中…');
+  try {
+    // verify token using local variable directly
+    const me = await fetch(`${GH_API}/user`, {
+      headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json' }
+    });
+    if (!me.ok) throw new Error('Token 无效，请检查（确认勾选了 gist 权限）');
+    ghUser=user; ghToken=token;
+    const gistId = await findOrCreateGist();
+    ghGist = gistId;
+    localStorage.setItem('mpl-gh-user',  ghUser);
+    localStorage.setItem('mpl-gh-token', ghToken);
+    localStorage.setItem('mpl-gh-gist',  ghGist);
+    setSyncDot('ok');
+    await cloudPull();
+    updateCloudUI();
+  } catch(e) {
+    showStatus('cloud-status-setup','连接失败：'+e.message,'err');
+    setSyncDot('err');
+  }
+}
+
+async function findOrCreateGist() {
+  const h = { 'Authorization': 'Bearer ' + ghToken, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' };
+  const r = await fetch(`${GH_API}/gists?per_page=100`, { headers: h });
+  if (!r.ok) throw new Error('无法读取 Gist 列表，状态码 ' + r.status);
+  const list = await r.json();
+  const found = list.find(g => g.files && g.files[GIST_FILE]);
+  if (found) return found.id;
+  const c = await fetch(`${GH_API}/gists`, {
+    method: 'POST', headers: h,
+    body: JSON.stringify({ description:'月计划表数据', public: false, files: { [GIST_FILE]: { content: JSON.stringify(allData()) } } })
+  });
+  if (!c.ok) throw new Error('创建 Gist 失败（状态码 ' + c.status + '），请确认 Token 勾选了 gist 权限');
+  const j = await c.json();
+  return j.id;
+}
+
+async function cloudPush(manual=false) {
+  if (!ghToken || !ghGist) return;
+  setSyncDot('ing');
+  try {
+    const r = await fetch(`${GH_API}/gists/${ghGist}`, {
+      method: 'PATCH',
+      headers: { 'Authorization':'Bearer '+ghToken, 'Accept':'application/vnd.github+json', 'Content-Type':'application/json' },
+      body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(allData()) } } })
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    setSyncDot('ok');
+    const t = new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+    showStatus('cloud-status',`已同步 · ${t}`,'ok');
+    localStorage.setItem('mpl-last-sync', new Date().toISOString());
+    updateCloudSub();
+  } catch(e) {
+    setSyncDot('err');
+    if (manual) showStatus('cloud-status','上传失败：'+e.message,'err');
+  }
+}
+
+async function cloudPull(manual=false) {
+  if (!ghToken || !ghGist) return;
+  setSyncDot('ing');
+  try {
+    const r = await fetch(`${GH_API}/gists/${ghGist}`, {
+      headers: { 'Authorization':'Bearer '+ghToken, 'Accept':'application/vnd.github+json' }
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const j = await r.json();
+    const content = j.files?.[GIST_FILE]?.content;
+    if (content) {
+      applyData(JSON.parse(content));
+      render(); loadTheme(); renderTodos(); renderSummary(); renderLegend();
+    }
+    setSyncDot('ok');
+    const t = new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
+    showStatus('cloud-status',`已同步 · ${t}`,'ok');
+    localStorage.setItem('mpl-last-sync', new Date().toISOString());
+    updateCloudSub();
+  } catch(e) {
+    setSyncDot('err');
+    if (manual) showStatus('cloud-status','还原失败：'+e.message,'err');
+  }
+}
+
+function scheduleSync() {
+  if (!ghToken || !ghGist) return;
+  clearTimeout(cloudTimer);
+  cloudTimer = setTimeout(()=>cloudPush(), 3000);
+}
+
+function updateCloudSub() {
+  const last = localStorage.getItem('mpl-last-sync');
+  if (!last) return;
+  const d = new Date(last);
+  const sub = document.getElementById('cloud-user-sub');
+  if (sub) sub.textContent = `上次同步 ${d.toLocaleDateString('zh-CN')} ${d.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}`;
+}
+
+function disconnectCloud() {
+  if (!confirm('确认断开云同步？本地数据不受影响。')) return;
+  ghUser=''; ghToken=''; ghGist='';
+  localStorage.removeItem('mpl-gh-user');
+  localStorage.removeItem('mpl-gh-token');
+  localStorage.removeItem('mpl-gh-gist');
+  setSyncDot('off');
+  updateCloudUI();
+}
+
+function updateCloudUI() {
+  const connected = !!(ghToken && ghGist);
+  document.getElementById('cloud-setup').style.display     = connected?'none':'block';
+  document.getElementById('cloud-connected').style.display = connected?'block':'none';
+  if (connected) {
+    document.getElementById('cloud-user-name').textContent = ghUser + ' / mpl-sync';
+    updateCloudSub();
+  } else {
+    if (ghUser) document.getElementById('gh-user').value = ghUser;
+  }
+}
+
+function openCloud() {
+  updateCloudUI();
+  document.getElementById('cloud-ov').classList.add('on');
+}
+function closeCloud() { document.getElementById('cloud-ov').classList.remove('on'); }
+
+// ─── Keyboard ─────────────────────────────────────────────────────────────
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){closeNote();closeMgr();closePicker();closeCloud();}
+  if((e.metaKey||e.ctrlKey)&&e.key==='Enter'&&document.getElementById('note-ov').classList.contains('on')) saveNote();
+});
+
+// ─── Init ─────────────────────────────────────────────────────────────────
+if(window.matchMedia('(prefers-color-scheme:dark)').matches){
+  document.documentElement.setAttribute('data-theme','dark');
+  document.getElementById('theme-icon').className='ti ti-sun';
+}
+render(); loadTheme(); renderTodos(); renderSummary();
+
+// 一次性清除 2026年8月 的错误数据
+if (!localStorage.getItem('mpl-aug-cleared')) {
+  for (let d = 1; d <= 31; d++) delete notes[`2026-8-${d}`];
+  saveNotes();
+  if (todos['2026-8']) { delete todos['2026-8']; saveTodos(); }
+  localStorage.setItem('mpl-aug-cleared', '1');
+  render();
+}
+
+if (ghToken && ghGist) { setSyncDot('ok'); cloudPull(); }
+</script>
+</body>
+</html>
