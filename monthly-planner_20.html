@@ -146,6 +146,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
   cursor:default;transition:background .12s;group:true;
 }
 .todo-item:hover{background:var(--sf2)}
+.todo-item.drag-over{background:var(--todo-acbg);outline:1.5px dashed var(--todo-ac)}
+.todo-item.dragging{opacity:.35}
+.todo-drag{cursor:grab;color:var(--tm);font-size:14px;flex-shrink:0;padding:1px 0 0;transition:color .12s}
+.todo-drag:hover{color:var(--todo-ac)}.todo-drag:active{cursor:grabbing}
 .todo-cb{
   width:17px;height:17px;border-radius:5px;border:1.5px solid var(--bd2);
   flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;
@@ -717,7 +721,7 @@ function renderRows() {
         <i class="ti ti-chevron-down" style="font-size:10px;opacity:.7"></i>
       </button>
       <textarea class="item-text-inp" placeholder="记录这件事…"
-        oninput="rowItems[${i}].text=this.value;autoResizeTA(this)"
+        oninput="rowInput(this,${i})"
         onkeydown="rowKD(event,${i})"
         rows="1">${esc(r.text)}</textarea>
       <button class="item-del-btn" onclick="removeRow(${i})" style="margin-top:6px"><i class="ti ti-x"></i></button>
@@ -740,8 +744,20 @@ function addRow() {
 }
 function removeRow(i) {
   rowItems.splice(i,1);
-  if(!rowItems.length) rowItems=[{tag:TAGS[0]?TAGS[0].id:null,text:''}];
   renderRows();
+}
+function rowInput(el,i) {
+  rowItems[i].text=el.value;
+  autoResizeTA(el);
+  if(el.value.length) return;
+  rowItems.splice(i,1);
+  renderRows();
+  const ins=document.querySelectorAll('.item-text-inp');
+  const next=ins[Math.min(i,ins.length-1)];
+  if(next) {
+    next.focus();
+    next.setSelectionRange(next.value.length,next.value.length);
+  }
 }
 function rowKD(e,i) {
   if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addRow();}
@@ -778,7 +794,7 @@ function closeNote() { document.getElementById('note-ov').classList.remove('on')
 
 function saveNote() {
   const k=nk(cur.getFullYear(),cur.getMonth(),editDay);
-  const filtered=rowItems.filter(r=>r.text.trim()||r.tag);
+  const filtered=rowItems.filter(r=>r.text.trim());
   if(filtered.length) notes[k]=filtered.map(r=>({tag:r.tag,text:r.text.trim()}));
   else delete notes[k];
   saveNotes(); closeNote(); render();
@@ -881,6 +897,66 @@ function deleteTodo(id) {
   saveTodos(); renderTodos();
 }
 
+let todoDragSrc=null;
+let todoPointerSrc=null;
+function reorderTodoById(srcId,dstId,scope) {
+  if(srcId===dstId) return false;
+  const key=todoMk(), list=todos[key]||[];
+  const src=list.findIndex(t=>t.id===srcId && (t.done?'done':'pending')===scope);
+  const dst=list.findIndex(t=>t.id===dstId && (t.done?'done':'pending')===scope);
+  if(src<0 || dst<0) return false;
+  const moved=list.splice(src,1)[0];
+  const insertAt=list.findIndex(t=>t.id===dstId);
+  list.splice(insertAt,0,moved);
+  todos[key]=list;
+  saveTodos();
+  return true;
+}
+function todoDragStart(e,id,scope) {
+  todoDragSrc={id,scope};
+  e.dataTransfer.effectAllowed='move';
+  setTimeout(()=>document.querySelector(`.todo-item[data-todo-id="${id}"]`)?.classList.add('dragging'),0);
+}
+function todoDragOver(e,id,scope) {
+  if(!todoDragSrc || todoDragSrc.scope!==scope) return;
+  e.preventDefault(); e.dataTransfer.dropEffect='move';
+  document.querySelectorAll('.todo-item').forEach(item=>{
+    item.classList.toggle('drag-over',item.dataset.todoId===id && id!==todoDragSrc.id);
+  });
+}
+function todoDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+function todoDrop(e,id,scope) {
+  e.preventDefault();
+  if(!todoDragSrc || todoDragSrc.scope!==scope || todoDragSrc.id===id) return;
+  reorderTodoById(todoDragSrc.id,id,scope);
+  todoDragSrc=null;
+  renderTodos();
+}
+function todoDragEnd() {
+  todoDragSrc=null;
+  document.querySelectorAll('.todo-item').forEach(item=>item.classList.remove('dragging','drag-over'));
+}
+function todoPointerStart(e,id,scope) {
+  todoPointerSrc={id,scope};
+  document.body.style.userSelect='none';
+  document.querySelector(`.todo-item[data-todo-id="${id}"]`)?.classList.add('dragging');
+  e.preventDefault();
+}
+function todoPointerEnter(id,scope) {
+  if(!todoPointerSrc || todoPointerSrc.scope!==scope || todoPointerSrc.id===id) return;
+  if(reorderTodoById(todoPointerSrc.id,id,scope)) {
+    renderTodos();
+    document.querySelector(`.todo-item[data-todo-id="${todoPointerSrc.id}"]`)?.classList.add('dragging');
+  }
+}
+document.addEventListener('pointerup',()=>{
+  todoPointerSrc=null;
+  document.body.style.userSelect='';
+  document.querySelectorAll('.todo-item').forEach(item=>item.classList.remove('dragging'));
+});
+
 function renderTodos() {
   const y=cur.getFullYear(),m=cur.getMonth();
   document.getElementById('todo-month-lbl').textContent=`${y}年${MN[m]}`;
@@ -892,7 +968,14 @@ function renderTodos() {
   let html='';
   // pending items
   pending.forEach(t=>{
-    html+=`<div class="todo-item">
+    html+=`<div class="todo-item" data-todo-id="${t.id}" draggable="true"
+      ondragstart="todoDragStart(event,'${t.id}','pending')"
+      ondragover="todoDragOver(event,'${t.id}','pending')"
+      ondrop="todoDrop(event,'${t.id}','pending')"
+      ondragleave="todoDragLeave(event)"
+      ondragend="todoDragEnd()"
+      onpointerenter="todoPointerEnter('${t.id}','pending')">
+      <span class="todo-drag" title="拖动排序" onpointerdown="todoPointerStart(event,'${t.id}','pending')"><i class="ti ti-grip-vertical"></i></span>
       <div class="todo-cb" onclick="toggleTodo('${t.id}')"><i class="ti ti-check"></i></div>
       <div class="todo-text">${esc(t.text)}</div>
       <button class="todo-del" onclick="deleteTodo('${t.id}')" title="删除"><i class="ti ti-x" style="font-size:12px"></i></button>
@@ -902,7 +985,14 @@ function renderTodos() {
   if(done.length){
     html+=`<div class="todo-sep"></div><div class="todo-done-label">已完成 ${done.length}</div>`;
     done.forEach(t=>{
-      html+=`<div class="todo-item">
+      html+=`<div class="todo-item" data-todo-id="${t.id}" draggable="true"
+        ondragstart="todoDragStart(event,'${t.id}','done')"
+        ondragover="todoDragOver(event,'${t.id}','done')"
+        ondrop="todoDrop(event,'${t.id}','done')"
+        ondragleave="todoDragLeave(event)"
+        ondragend="todoDragEnd()"
+        onpointerenter="todoPointerEnter('${t.id}','done')">
+        <span class="todo-drag" title="拖动排序" onpointerdown="todoPointerStart(event,'${t.id}','done')"><i class="ti ti-grip-vertical"></i></span>
         <div class="todo-cb done" onclick="toggleTodo('${t.id}')"><i class="ti ti-check"></i></div>
         <div class="todo-text done">${esc(t.text)}</div>
         <button class="todo-del" onclick="deleteTodo('${t.id}')" title="删除"><i class="ti ti-x" style="font-size:12px"></i></button>
