@@ -160,9 +160,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
 .todo-cb.done i{display:block}
 .todo-text{
   flex:1;min-width:0;font-size:12.5px;line-height:1.55;color:var(--tp);
-  word-break:break-all;transition:color .15s;
+  word-break:break-all;transition:color .15s;border:.5px solid transparent;border-radius:7px;
+  padding:1px 4px;margin:-1px -4px;cursor:text;
 }
+.todo-text:hover{border-color:var(--bd);background:var(--sf2)}
 .todo-text.done{color:var(--tm);text-decoration:line-through;text-decoration-color:var(--tm)}
+.todo-edit{
+  flex:1;min-width:0;font-size:12.5px;line-height:1.55;color:var(--tp);
+  border:.5px solid var(--todo-ac);border-radius:7px;background:var(--sf2);
+  padding:1px 4px;margin:-1px -4px;font-family:inherit;outline:none;
+}
 .todo-del{
   opacity:0;background:none;border:none;cursor:pointer;color:var(--tm);
   font-size:14px;padding:1px 3px;flex-shrink:0;transition:opacity .12s,color .12s;
@@ -570,6 +577,7 @@ const tC   = t       => dark() ? t.dL : t.L;
 const tB   = t       => dark() ? t.dB : t.B;
 const bgV  = id      => { const c=BG_COLORS.find(b=>b.id===id); return c?(dark()?c.D:c.L):null; };
 const esc  = s       => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const escAttr = s    => esc(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 
 // ─── Theme ───────────────────────────────────────────────────────────────
 function toggleTheme() {
@@ -981,6 +989,38 @@ function deleteTodo(id) {
   todos[key]=(todos[key]||[]).filter(t=>t.id!==id);
   saveTodos(); renderTodos();
 }
+function editTodo(id) {
+  document.querySelectorAll('.todo-edit').forEach(inp=>finishTodoEdit(inp.dataset.todoId,false));
+  const textEl=document.querySelector(`.todo-text[data-todo-id="${id}"]`);
+  const key=todoMk(), item=(todos[key]||[]).find(t=>t.id===id);
+  if(!textEl || !item) return;
+  textEl.outerHTML=`<input class="todo-edit${item.done?' done':''}" data-todo-id="${id}" value="${escAttr(item.text)}"
+    onblur="finishTodoEdit('${id}',true)"
+    onkeydown="todoEditKD(event,'${id}')">`;
+  const inp=document.querySelector(`.todo-edit[data-todo-id="${id}"]`);
+  if(inp) {
+    inp.focus();
+    inp.setSelectionRange(inp.value.length,inp.value.length);
+  }
+}
+function finishTodoEdit(id,save=true) {
+  const inp=document.querySelector(`.todo-edit[data-todo-id="${id}"]`);
+  if(!inp) return;
+  const key=todoMk(), list=todos[key]||[];
+  const item=list.find(t=>t.id===id);
+  if(!item) { renderTodos(); return; }
+  if(save) {
+    const text=inp.value.trim();
+    if(!text) todos[key]=list.filter(t=>t.id!==id);
+    else item.text=text;
+    saveTodos();
+  }
+  renderTodos();
+}
+function todoEditKD(e,id) {
+  if(e.key==='Enter') { e.preventDefault(); finishTodoEdit(id,true); }
+  if(e.key==='Escape') { e.preventDefault(); finishTodoEdit(id,false); }
+}
 
 let todoDragSrc=null;
 let todoPointerSrc=null, todoPressTimer=null, todoPressActive=false;
@@ -1086,7 +1126,7 @@ function renderTodos() {
       onpointerenter="todoPointerEnter('${t.id}','pending')">
       <span class="todo-drag" title="长按拖动排序" onpointerdown="todoPointerStart(event,'${t.id}','pending')"><i class="ti ti-grip-vertical"></i></span>
       <div class="todo-cb" onclick="toggleTodo('${t.id}')"><i class="ti ti-check"></i></div>
-      <div class="todo-text">${esc(t.text)}</div>
+      <div class="todo-text" data-todo-id="${t.id}" onclick="editTodo('${t.id}')">${esc(t.text)}</div>
       <button class="todo-del" onclick="deleteTodo('${t.id}')" title="删除"><i class="ti ti-x" style="font-size:12px"></i></button>
     </div>`;
   });
@@ -1103,7 +1143,7 @@ function renderTodos() {
         onpointerenter="todoPointerEnter('${t.id}','done')">
         <span class="todo-drag" title="长按拖动排序" onpointerdown="todoPointerStart(event,'${t.id}','done')"><i class="ti ti-grip-vertical"></i></span>
         <div class="todo-cb done" onclick="toggleTodo('${t.id}')"><i class="ti ti-check"></i></div>
-        <div class="todo-text done">${esc(t.text)}</div>
+        <div class="todo-text done" data-todo-id="${t.id}" onclick="editTodo('${t.id}')">${esc(t.text)}</div>
         <button class="todo-del" onclick="deleteTodo('${t.id}')" title="删除"><i class="ti ti-x" style="font-size:12px"></i></button>
       </div>`;
     });
