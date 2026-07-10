@@ -693,8 +693,8 @@ function openNote(d) {
   const dow=new Date(y,m,d).getDay();
   const existing=notes[k];
   rowItems=existing&&existing.length
-    ?existing.map(r=>({tag:r.tag||null,text:r.text||''}))
-    :[{tag:TAGS[0]?TAGS[0].id:null,text:''}];
+    ?existing.map(r=>({tag:r.tag||null,text:r.text||'',hadText:!!(r.text||'').trim(),emptyBuffered:false}))
+    :[{tag:TAGS[0]?TAGS[0].id:null,text:'',hadText:false,emptyBuffered:false}];
   document.getElementById('note-date').textContent=`${WDS[dow]} · ${y}年${m+1}月${d}日`;
   document.getElementById('note-del').style.display=existing&&existing.length?'':'none';
   renderRows();
@@ -737,7 +737,7 @@ function autoResizeTA(el) {
 }
 
 function addRow() {
-  rowItems.push({tag:TAGS[0]?TAGS[0].id:null,text:''});
+  rowItems.push({tag:TAGS[0]?TAGS[0].id:null,text:'',hadText:false,emptyBuffered:false});
   renderRows();
   const ins=document.querySelectorAll('.item-text-inp');
   if(ins.length) ins[ins.length-1].focus();
@@ -747,11 +747,23 @@ function removeRow(i) {
   renderRows();
 }
 function rowInput(el,i) {
-  rowItems[i].text=el.value;
+  const item=rowItems[i];
+  if(!item) return;
+  item.text=el.value;
   autoResizeTA(el);
-  if(el.value.length) return;
-  rowItems.splice(i,1);
-  renderRows();
+  if(el.value.length) {
+    item.hadText=true;
+    item.emptyBuffered=false;
+    return;
+  }
+  if(item.hadText && !item.emptyBuffered) {
+    item.emptyBuffered=true;
+    return;
+  }
+  removeRow(i);
+  focusRowAfterRemoval(i);
+}
+function focusRowAfterRemoval(i) {
   const ins=document.querySelectorAll('.item-text-inp');
   const next=ins[Math.min(i,ins.length-1)];
   if(next) {
@@ -760,6 +772,12 @@ function rowInput(el,i) {
   }
 }
 function rowKD(e,i) {
+  if((e.key==='Backspace'||e.key==='Delete') && !rowItems[i]?.text) {
+    e.preventDefault();
+    removeRow(i);
+    focusRowAfterRemoval(i);
+    return;
+  }
   if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();addRow();}
 }
 
