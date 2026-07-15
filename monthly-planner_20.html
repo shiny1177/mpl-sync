@@ -65,8 +65,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
 }
 .dc:hover{border-color:var(--bd2)}
 .dc.empty{background:transparent;border-color:transparent;box-shadow:none;cursor:default}
-.dc.today{border-color:var(--ac);border-width:1.5px}
 .dc.has-note{border-color:var(--bd2)}
+.dc.today{border-color:var(--ac);border-width:1.5px;box-shadow:var(--sh)}
 .dc.wknd .dnum{color:var(--tm)}
 .dc.today .dnum{color:var(--actl);font-weight:700}
 .dc.sel-mode{cursor:crosshair}
@@ -107,6 +107,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
 .sec-lbl i{font-size:14px}
 .plain-ta{width:100%;border:none;background:none;font-family:inherit;font-size:13px;color:var(--tp);line-height:1.7;resize:none;outline:none;min-height:32px;max-height:none;overflow:hidden}
 .plain-ta::placeholder{color:var(--tm)}
+.essay-block{padding-top:14px}
+.essay-ta{min-height:86px}
 
 /* ── stats ── */
 .stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
@@ -389,6 +391,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
       <div class="theme-block">
         <div class="sec-lbl"><i class="ti ti-bulb"></i>本月主题</div>
         <textarea class="plain-ta" id="cal-theme" placeholder="用几个词概括这个月的主题…" oninput="autoSaveTheme(this)"></textarea>
+      </div>
+      <div class="theme-block essay-block">
+        <div class="sec-lbl"><i class="ti ti-pencil"></i>随笔</div>
+        <textarea class="plain-ta essay-ta" id="cal-essay" placeholder="写一点这个月的想法、观察或碎碎念…" oninput="autoSaveEssay(this)"></textarea>
       </div>
       <div class="stats-row" id="stats-row"></div>
     </div>
@@ -945,7 +951,7 @@ function addTag() {
   renderMgrList(); renderLegend();
 }
 
-// ─── Month theme ──────────────────────────────────────────────────────────
+// ─── Month notes ──────────────────────────────────────────────────────────
 let thTimer=null;
 function loadTheme() {
   const s=summaries[mk(cur.getFullYear(),cur.getMonth())]||{};
@@ -953,6 +959,11 @@ function loadTheme() {
   if(el) {
     el.value=s.calTheme||'';
     autoResizeTA(el);
+  }
+  const essay=document.getElementById('cal-essay');
+  if(essay) {
+    essay.value=s.calEssay||'';
+    autoResizeTA(essay);
   }
 }
 function autoSaveTheme(el) {
@@ -962,6 +973,17 @@ function autoSaveTheme(el) {
     const key=mk(cur.getFullYear(),cur.getMonth());
     if(!summaries[key]) summaries[key]={};
     summaries[key].calTheme=document.getElementById('cal-theme').value;
+    saveSums();
+  },500);
+}
+let essayTimer=null;
+function autoSaveEssay(el) {
+  if(el) autoResizeTA(el);
+  clearTimeout(essayTimer);
+  essayTimer=setTimeout(()=>{
+    const key=mk(cur.getFullYear(),cur.getMonth());
+    if(!summaries[key]) summaries[key]={};
+    summaries[key].calEssay=document.getElementById('cal-essay').value;
     saveSums();
   },500);
 }
