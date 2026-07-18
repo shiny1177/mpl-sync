@@ -122,6 +122,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
   background:var(--surface);border:1.5px solid var(--todo-bd);border-radius:var(--r);
   padding:16px;box-shadow:var(--sh);position:sticky;top:20px;
 }
+.todo-section+.todo-section{margin-top:18px;padding-top:16px;border-top:.5px solid var(--todo-bd)}
 .todo-title{font-size:14px;font-weight:600;color:var(--todo-ac);margin-bottom:4px;display:flex;align-items:center;gap:6px}
 .todo-month{font-size:11px;color:var(--todo-ac);opacity:.7;margin-bottom:12px}
 
@@ -148,7 +149,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
   cursor:default;transition:background .12s;group:true;
 }
 .todo-item:hover{background:var(--sf2)}
-.todo-item.drag-over{background:var(--todo-acbg);outline:1.5px dashed var(--todo-ac)}
+.todo-item.drag-over{background:var(--todo-acbg)}
+.todo-item.drag-over-before{box-shadow:0 -2px 0 var(--todo-ac)}
+.todo-item.drag-over-after{box-shadow:0 2px 0 var(--todo-ac)}
 .todo-item.dragging{opacity:.35}
 .todo-drag{cursor:grab;color:var(--tm);font-size:14px;flex-shrink:0;padding:1px 0 0;transition:color .12s;touch-action:none;user-select:none}
 .todo-drag:hover{color:var(--todo-ac)}.todo-drag:active{cursor:grabbing}
@@ -401,14 +404,28 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
 
     <!-- right: todo aside -->
     <div class="todo-aside">
-      <div class="todo-title"><i class="ti ti-checklist" style="font-size:16px"></i>本月待办</div>
-      <div class="todo-month" id="todo-month-lbl"></div>
-      <div class="todo-add-row">
-        <input class="todo-inp" id="todo-inp" type="text" placeholder="添加一件待办事项…" maxlength="60"
-          onkeydown="if(event.key==='Enter')addTodo()">
-        <button class="todo-add-btn" onclick="addTodo()" title="添加"><i class="ti ti-plus"></i></button>
+      <div class="todo-section">
+        <div class="todo-title"><i class="ti ti-list-check" style="font-size:16px"></i>本周待办</div>
+        <div class="todo-month" id="week-todo-lbl"></div>
+        <div class="todo-add-row">
+          <input class="todo-inp" id="week-todo-inp" type="text" placeholder="添加一件本周待办…" maxlength="60"
+            onkeydown="if(event.key==='Enter')addWeekTodo()">
+          <button class="todo-add-btn" onclick="addWeekTodo()" title="添加"><i class="ti ti-plus"></i></button>
+        </div>
+        <div class="todo-list" id="week-todo-list"
+          ondragover="todoListDragOver(event,'week')" ondrop="todoListDrop(event,'week')"></div>
       </div>
-      <div class="todo-list" id="todo-list"></div>
+      <div class="todo-section">
+        <div class="todo-title"><i class="ti ti-checklist" style="font-size:16px"></i>本月待办</div>
+        <div class="todo-month" id="todo-month-lbl"></div>
+        <div class="todo-add-row">
+          <input class="todo-inp" id="todo-inp" type="text" placeholder="添加一件本月待办…" maxlength="60"
+            onkeydown="if(event.key==='Enter')addTodo()">
+          <button class="todo-add-btn" onclick="addTodo()" title="添加"><i class="ti ti-plus"></i></button>
+        </div>
+        <div class="todo-list" id="todo-list"
+          ondragover="todoListDragOver(event,'month')" ondrop="todoListDrop(event,'month')"></div>
+      </div>
     </div>
 
   </div>
@@ -559,6 +576,7 @@ let notes     = JSON.parse(localStorage.getItem('mpl-notes')     || '{}');
 let summaries = JSON.parse(localStorage.getItem('mpl-summaries') || '{}');
 let dayBg     = JSON.parse(localStorage.getItem('mpl-daybg')     || '{}');
 let todos     = JSON.parse(localStorage.getItem('mpl-todos')     || '{}');
+let weekTodos = JSON.parse(localStorage.getItem('mpl-week-todos') || '{}');
 
 const today  = new Date();
 let cur      = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -575,6 +593,7 @@ const saveNotes = () => { localStorage.setItem('mpl-notes',     JSON.stringify(n
 const saveSums  = () => { localStorage.setItem('mpl-summaries', JSON.stringify(summaries)); scheduleSync(); };
 const saveBg    = () => { localStorage.setItem('mpl-daybg',     JSON.stringify(dayBg));     scheduleSync(); };
 const saveTodos = () => { localStorage.setItem('mpl-todos',     JSON.stringify(todos));     scheduleSync(); };
+const saveWeekTodos = () => { localStorage.setItem('mpl-week-todos', JSON.stringify(weekTodos)); scheduleSync(); };
 
 const nk   = (y,m,d) => `${y}-${m+1}-${d}`;
 const mk   = (y,m)   => `${y}-${m+1}`;
@@ -990,131 +1009,218 @@ function autoSaveEssay(el) {
 
 // ─── TODO list ────────────────────────────────────────────────────────────
 function todoMk() { return mk(cur.getFullYear(),cur.getMonth()); }
-
-function addTodo() {
-  const inp=document.getElementById('todo-inp');
+function weekStart(d=today) {
+  const s=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  s.setDate(s.getDate()-((s.getDay()+6)%7));
+  return s;
+}
+function weekTodoMk() {
+  const s=weekStart();
+  return `${s.getFullYear()}-${s.getMonth()+1}-${s.getDate()}`;
+}
+function weekTodoLabel() {
+  const s=weekStart(), e=new Date(s);
+  e.setDate(s.getDate()+6);
+  return `${s.getMonth()+1}月${s.getDate()}日 - ${e.getMonth()+1}月${e.getDate()}日`;
+}
+function todoConfig(kind) {
+  if(kind==='week') return {
+    key:weekTodoMk(), store:weekTodos, save:saveWeekTodos,
+    input:'week-todo-inp', list:'week-todo-list', label:'week-todo-lbl', labelText:weekTodoLabel()
+  };
+  const y=cur.getFullYear(),m=cur.getMonth();
+  return {
+    key:todoMk(), store:todos, save:saveTodos,
+    input:'todo-inp', list:'todo-list', label:'todo-month-lbl', labelText:`${y}年${MN[m]}`
+  };
+}
+function todoList(kind) {
+  const c=todoConfig(kind);
+  if(!c.store[c.key]) c.store[c.key]=[];
+  return c.store[c.key];
+}
+function addTodo() { addTodoFor('month'); }
+function addWeekTodo() { addTodoFor('week'); }
+function addTodoFor(kind) {
+  const c=todoConfig(kind), inp=document.getElementById(c.input);
   const text=inp.value.trim(); if(!text) return;
-  const key=todoMk();
-  if(!todos[key]) todos[key]=[];
-  todos[key].push({id:'t'+Date.now(), text, done:false});
-  saveTodos(); inp.value=''; renderTodos();
+  c.store[c.key]=todoList(kind);
+  c.store[c.key].push({id:'t'+Date.now(), text, done:false});
+  c.save(); inp.value=''; renderTodos();
 }
-
-function toggleTodo(id) {
-  const key=todoMk(), list=todos[key]||[];
-  const item=list.find(t=>t.id===id); if(item) item.done=!item.done;
-  saveTodos(); renderTodos();
+function toggleTodo(kind,id) {
+  const c=todoConfig(kind), item=todoList(kind).find(t=>t.id===id);
+  if(item) item.done=!item.done;
+  c.save(); renderTodos();
 }
-
-function deleteTodo(id) {
-  const key=todoMk();
-  todos[key]=(todos[key]||[]).filter(t=>t.id!==id);
-  saveTodos(); renderTodos();
+function deleteTodo(kind,id) {
+  const c=todoConfig(kind);
+  c.store[c.key]=todoList(kind).filter(t=>t.id!==id);
+  c.save(); renderTodos();
 }
-function editTodo(id) {
-  document.querySelectorAll('.todo-edit').forEach(inp=>finishTodoEdit(inp.dataset.todoId,false));
-  const textEl=document.querySelector(`.todo-text[data-todo-id="${id}"]`);
-  const key=todoMk(), item=(todos[key]||[]).find(t=>t.id===id);
+function editTodo(kind,id) {
+  document.querySelectorAll('.todo-edit').forEach(inp=>finishTodoEdit(inp.dataset.todoKind,inp.dataset.todoId,false));
+  const textEl=document.querySelector(`.todo-text[data-todo-kind="${kind}"][data-todo-id="${id}"]`);
+  const item=todoList(kind).find(t=>t.id===id);
   if(!textEl || !item) return;
-  textEl.outerHTML=`<input class="todo-edit${item.done?' done':''}" data-todo-id="${id}" value="${escAttr(item.text)}"
-    onblur="finishTodoEdit('${id}',true)"
-    onkeydown="todoEditKD(event,'${id}')">`;
-  const inp=document.querySelector(`.todo-edit[data-todo-id="${id}"]`);
+  textEl.outerHTML=`<input class="todo-edit${item.done?' done':''}" data-todo-kind="${kind}" data-todo-id="${id}" value="${escAttr(item.text)}"
+    onblur="finishTodoEdit('${kind}','${id}',true)"
+    onkeydown="todoEditKD(event,'${kind}','${id}')">`;
+  const inp=document.querySelector(`.todo-edit[data-todo-kind="${kind}"][data-todo-id="${id}"]`);
   if(inp) {
     inp.focus();
     inp.setSelectionRange(inp.value.length,inp.value.length);
   }
 }
-function finishTodoEdit(id,save=true) {
-  const inp=document.querySelector(`.todo-edit[data-todo-id="${id}"]`);
+function finishTodoEdit(kind,id,save=true) {
+  const inp=document.querySelector(`.todo-edit[data-todo-kind="${kind}"][data-todo-id="${id}"]`);
   if(!inp) return;
-  const key=todoMk(), list=todos[key]||[];
-  const item=list.find(t=>t.id===id);
+  const c=todoConfig(kind), list=todoList(kind), item=list.find(t=>t.id===id);
   if(!item) { renderTodos(); return; }
   if(save) {
     const text=inp.value.trim();
-    if(!text) todos[key]=list.filter(t=>t.id!==id);
+    if(!text) c.store[c.key]=list.filter(t=>t.id!==id);
     else item.text=text;
-    saveTodos();
+    c.save();
   }
   renderTodos();
 }
-function todoEditKD(e,id) {
-  if(e.key==='Enter') { e.preventDefault(); finishTodoEdit(id,true); }
-  if(e.key==='Escape') { e.preventDefault(); finishTodoEdit(id,false); }
+function todoEditKD(e,kind,id) {
+  if(e.key==='Enter') { e.preventDefault(); finishTodoEdit(kind,id,true); }
+  if(e.key==='Escape') { e.preventDefault(); finishTodoEdit(kind,id,false); }
 }
 
 let todoDragSrc=null;
 let todoPointerSrc=null, todoPressTimer=null, todoPressActive=false;
-function reorderTodoById(srcId,dstId,scope) {
-  if(srcId===dstId) return false;
-  const key=todoMk(), list=todos[key]||[];
-  const src=list.findIndex(t=>t.id===srcId && (t.done?'done':'pending')===scope);
-  const dst=list.findIndex(t=>t.id===dstId && (t.done?'done':'pending')===scope);
+function todoScope(t) { return t.done?'done':'pending'; }
+function reorderTodoById(kind,srcId,dstId,scope,placeAfter=false) {
+  const c=todoConfig(kind), list=todoList(kind);
+  const scoped=list.filter(t=>todoScope(t)===scope);
+  const src=scoped.findIndex(t=>t.id===srcId);
+  const dst=dstId?scoped.findIndex(t=>t.id===dstId):scoped.length;
   if(src<0 || dst<0) return false;
-  const moved=list.splice(src,1)[0];
-  const insertAt=list.findIndex(t=>t.id===dstId);
-  list.splice(insertAt,0,moved);
-  todos[key]=list;
-  saveTodos();
+  let insertAt=dst+(placeAfter?1:0);
+  if(src===insertAt || src+1===insertAt) return false;
+  const moved=scoped.splice(src,1)[0];
+  if(src<insertAt) insertAt--;
+  scoped.splice(Math.max(0,Math.min(insertAt,scoped.length)),0,moved);
+  let scopedIdx=0;
+  c.store[c.key]=list.map(t=>todoScope(t)===scope ? scoped[scopedIdx++] : t);
+  c.save();
   return true;
 }
-function todoDragStart(e,id,scope) {
-  todoDragSrc={id,scope};
-  e.dataTransfer.effectAllowed='move';
-  setTimeout(()=>document.querySelector(`.todo-item[data-todo-id="${id}"]`)?.classList.add('dragging'),0);
+function moveTodoToKind(srcKind,dstKind,srcId,dstId,scope,placeAfter=false) {
+  const srcC=todoConfig(srcKind), dstC=todoConfig(dstKind);
+  const srcList=todoList(srcKind), dstList=todoList(dstKind);
+  const srcIdx=srcList.findIndex(t=>t.id===srcId);
+  if(srcIdx<0) return false;
+  const moved=srcList.splice(srcIdx,1)[0];
+  moved.done=scope==='done';
+  const scoped=dstList.filter(t=>todoScope(t)===scope);
+  const dst=dstId?scoped.findIndex(t=>t.id===dstId):scoped.length;
+  if(dst<0) {
+    srcList.splice(srcIdx,0,moved);
+    return false;
+  }
+  let insertAt=dst+(placeAfter?1:0);
+  scoped.splice(Math.max(0,Math.min(insertAt,scoped.length)),0,moved);
+  dstC.store[dstC.key]=dstList.filter(t=>todoScope(t)!==scope).concat(scoped);
+  srcC.store[srcC.key]=srcList;
+  srcC.save(); dstC.save();
+  return true;
 }
-function todoDragOver(e,id,scope) {
+function placeTodo(kind,srcKind,srcId,dstId,scope,placeAfter=false) {
+  return kind===srcKind
+    ? reorderTodoById(kind,srcId,dstId,scope,placeAfter)
+    : moveTodoToKind(srcKind,kind,srcId,dstId,scope,placeAfter);
+}
+function clearTodoDropMarks() {
+  document.querySelectorAll('.todo-item').forEach(item=>item.classList.remove('drag-over','drag-over-before','drag-over-after'));
+}
+function markTodoDropTarget(kind,id,placeAfter) {
+  clearTodoDropMarks();
+  const item=document.querySelector(`.todo-item[data-todo-kind="${kind}"][data-todo-id="${id}"]`);
+  if(item) item.classList.add('drag-over',placeAfter?'drag-over-after':'drag-over-before');
+}
+function todoDragStart(e,kind,id,scope) {
+  todoDragSrc={kind,id,scope};
+  e.dataTransfer.effectAllowed='move';
+  e.dataTransfer.setData('text/plain', id);
+  setTimeout(()=>document.querySelector(`.todo-item[data-todo-kind="${kind}"][data-todo-id="${id}"]`)?.classList.add('dragging'),0);
+}
+function todoDragOver(e,kind,id,scope) {
   if(!todoDragSrc || todoDragSrc.scope!==scope) return;
   e.preventDefault(); e.dataTransfer.dropEffect='move';
-  document.querySelectorAll('.todo-item').forEach(item=>{
-    item.classList.toggle('drag-over',item.dataset.todoId===id && id!==todoDragSrc.id);
-  });
+  const rect=e.currentTarget.getBoundingClientRect();
+  markTodoDropTarget(kind,id,e.clientY>rect.top+rect.height/2);
 }
 function todoDragLeave(e) {
-  e.currentTarget.classList.remove('drag-over');
+  e.currentTarget.classList.remove('drag-over','drag-over-before','drag-over-after');
 }
-function todoDrop(e,id,scope) {
+function todoDrop(e,kind,id,scope) {
   e.preventDefault();
-  if(!todoDragSrc || todoDragSrc.scope!==scope || todoDragSrc.id===id) return;
-  reorderTodoById(todoDragSrc.id,id,scope);
+  if(!todoDragSrc || todoDragSrc.scope!==scope || (todoDragSrc.kind===kind && todoDragSrc.id===id)) return;
+  const rect=e.currentTarget.getBoundingClientRect();
+  placeTodo(kind,todoDragSrc.kind,todoDragSrc.id,id,scope,e.clientY>rect.top+rect.height/2);
+  todoDragSrc=null;
+  renderTodos();
+}
+function todoListDragOver(e,kind) {
+  if(!todoDragSrc || todoDragSrc.kind===kind) return;
+  e.preventDefault(); e.dataTransfer.dropEffect='move';
+}
+function todoListDrop(e,kind) {
+  if(!todoDragSrc || todoDragSrc.kind===kind || e.target.closest('.todo-item')) return;
+  e.preventDefault();
+  placeTodo(kind,todoDragSrc.kind,todoDragSrc.id,null,todoDragSrc.scope,true);
   todoDragSrc=null;
   renderTodos();
 }
 function todoDragEnd() {
   todoDragSrc=null;
-  document.querySelectorAll('.todo-item').forEach(item=>item.classList.remove('dragging','drag-over'));
+  document.querySelectorAll('.todo-item').forEach(item=>item.classList.remove('dragging','drag-over','drag-over-before','drag-over-after'));
 }
-function todoPointerStart(e,id,scope) {
+function todoPointerStart(e,kind,id,scope) {
   if(e.pointerType==='mouse') return;
   clearTimeout(todoPressTimer);
   todoPressTimer=setTimeout(()=>{
-    todoPointerSrc={id,scope};
+    todoPointerSrc={kind,id,scope};
     todoPressActive=true;
     document.body.style.userSelect='none';
-    document.querySelector(`.todo-item[data-todo-id="${id}"]`)?.classList.add('dragging');
+    document.querySelector(`.todo-item[data-todo-kind="${kind}"][data-todo-id="${id}"]`)?.classList.add('dragging');
   },450);
   e.preventDefault();
 }
-function todoPointerEnter(id,scope) {
-  if(!todoPressActive || !todoPointerSrc || todoPointerSrc.scope!==scope || todoPointerSrc.id===id) return;
-  moveTodoByPointer(id,scope);
-}
-function moveTodoByPointer(id,scope) {
-  if(!todoPointerSrc || todoPointerSrc.scope!==scope || todoPointerSrc.id===id) return;
-  if(reorderTodoById(todoPointerSrc.id,id,scope)) {
+function moveTodoByPointer(kind,id,scope,placeAfter=false) {
+  if(!todoPointerSrc || todoPointerSrc.scope!==scope || (todoPointerSrc.kind===kind && todoPointerSrc.id===id)) return;
+  if(placeTodo(kind,todoPointerSrc.kind,todoPointerSrc.id,id,scope,placeAfter)) {
+    todoPointerSrc.kind=kind;
     renderTodos();
-    document.querySelector(`.todo-item[data-todo-id="${todoPointerSrc.id}"]`)?.classList.add('dragging');
+    document.querySelector(`.todo-item[data-todo-kind="${kind}"][data-todo-id="${todoPointerSrc.id}"]`)?.classList.add('dragging');
   }
 }
 function todoPointerMove(e) {
   if(!todoPressActive) return;
   e.preventDefault();
   const target=document.elementFromPoint(e.clientX,e.clientY)?.closest('.todo-item');
-  if(!target || !document.getElementById('todo-list').contains(target)) return;
-  const id=target.dataset.todoId;
-  const item=(todos[todoMk()]||[]).find(t=>t.id===id);
-  if(item) moveTodoByPointer(id,item.done?'done':'pending');
+  if(!target) {
+    const listEl=document.elementFromPoint(e.clientX,e.clientY)?.closest('.todo-list');
+    if(listEl && todoPointerSrc && listEl.id!==todoConfig(todoPointerSrc.kind).list) {
+      const kind=listEl.id==='week-todo-list'?'week':'month';
+      if(placeTodo(kind,todoPointerSrc.kind,todoPointerSrc.id,null,todoPointerSrc.scope,true)) {
+        todoPointerSrc.kind=kind;
+        renderTodos();
+        document.querySelector(`.todo-item[data-todo-kind="${kind}"][data-todo-id="${todoPointerSrc.id}"]`)?.classList.add('dragging');
+      }
+    }
+    return;
+  }
+  const kind=target.dataset.todoKind, id=target.dataset.todoId;
+  const item=todoList(kind).find(t=>t.id===id);
+  if(item) {
+    const rect=target.getBoundingClientRect();
+    moveTodoByPointer(kind,id,todoScope(item),e.clientY>rect.top+rect.height/2);
+  }
 }
 function todoPointerEnd() {
   clearTimeout(todoPressTimer);
@@ -1129,44 +1235,43 @@ document.addEventListener('pointercancel',todoPointerEnd);
 document.addEventListener('pointermove',todoPointerMove,{passive:false});
 
 function renderTodos() {
-  const y=cur.getFullYear(),m=cur.getMonth();
-  document.getElementById('todo-month-lbl').textContent=`${y}年${MN[m]}`;
-  const key=todoMk(), list=todos[key]||[];
+  renderTodoSection('week');
+  renderTodoSection('month');
+}
+function renderTodoSection(kind) {
+  const c=todoConfig(kind), list=c.store[c.key]||[];
+  document.getElementById(c.label).textContent=c.labelText;
   const pending=list.filter(t=>!t.done), done=list.filter(t=>t.done);
-  const el=document.getElementById('todo-list');
+  const el=document.getElementById(c.list);
   if(!list.length){ el.innerHTML=`<div class="todo-empty">暂无待办，添加一件吧</div>`; return; }
 
   let html='';
-  // pending items
   pending.forEach(t=>{
-    html+=`<div class="todo-item" data-todo-id="${t.id}" draggable="true"
-      ondragstart="todoDragStart(event,'${t.id}','pending')"
-      ondragover="todoDragOver(event,'${t.id}','pending')"
-      ondrop="todoDrop(event,'${t.id}','pending')"
+    html+=`<div class="todo-item" data-todo-kind="${kind}" data-todo-id="${t.id}" draggable="true"
+      ondragstart="todoDragStart(event,'${kind}','${t.id}','pending')"
+      ondragover="todoDragOver(event,'${kind}','${t.id}','pending')"
+      ondrop="todoDrop(event,'${kind}','${t.id}','pending')"
       ondragleave="todoDragLeave(event)"
-      ondragend="todoDragEnd()"
-      onpointerenter="todoPointerEnter('${t.id}','pending')">
-      <span class="todo-drag" title="长按拖动排序" onpointerdown="todoPointerStart(event,'${t.id}','pending')"><i class="ti ti-grip-vertical"></i></span>
-      <div class="todo-cb" onclick="toggleTodo('${t.id}')"><i class="ti ti-check"></i></div>
-      <div class="todo-text" data-todo-id="${t.id}" onclick="editTodo('${t.id}')">${esc(t.text)}</div>
-      <button class="todo-del" onclick="deleteTodo('${t.id}')" title="删除"><i class="ti ti-x" style="font-size:12px"></i></button>
+      ondragend="todoDragEnd()">
+      <span class="todo-drag" title="长按拖动排序" onpointerdown="todoPointerStart(event,'${kind}','${t.id}','pending')"><i class="ti ti-grip-vertical"></i></span>
+      <div class="todo-cb" onclick="toggleTodo('${kind}','${t.id}')"><i class="ti ti-check"></i></div>
+      <div class="todo-text" data-todo-kind="${kind}" data-todo-id="${t.id}" onclick="editTodo('${kind}','${t.id}')">${esc(t.text)}</div>
+      <button class="todo-del" onclick="deleteTodo('${kind}','${t.id}')" title="删除"><i class="ti ti-x" style="font-size:12px"></i></button>
     </div>`;
   });
-  // done items
   if(done.length){
     html+=`<div class="todo-sep"></div><div class="todo-done-label">已完成 ${done.length}</div>`;
     done.forEach(t=>{
-      html+=`<div class="todo-item" data-todo-id="${t.id}" draggable="true"
-        ondragstart="todoDragStart(event,'${t.id}','done')"
-        ondragover="todoDragOver(event,'${t.id}','done')"
-        ondrop="todoDrop(event,'${t.id}','done')"
+      html+=`<div class="todo-item" data-todo-kind="${kind}" data-todo-id="${t.id}" draggable="true"
+        ondragstart="todoDragStart(event,'${kind}','${t.id}','done')"
+        ondragover="todoDragOver(event,'${kind}','${t.id}','done')"
+        ondrop="todoDrop(event,'${kind}','${t.id}','done')"
         ondragleave="todoDragLeave(event)"
-        ondragend="todoDragEnd()"
-        onpointerenter="todoPointerEnter('${t.id}','done')">
-        <span class="todo-drag" title="长按拖动排序" onpointerdown="todoPointerStart(event,'${t.id}','done')"><i class="ti ti-grip-vertical"></i></span>
-        <div class="todo-cb done" onclick="toggleTodo('${t.id}')"><i class="ti ti-check"></i></div>
-        <div class="todo-text done" data-todo-id="${t.id}" onclick="editTodo('${t.id}')">${esc(t.text)}</div>
-        <button class="todo-del" onclick="deleteTodo('${t.id}')" title="删除"><i class="ti ti-x" style="font-size:12px"></i></button>
+        ondragend="todoDragEnd()">
+        <span class="todo-drag" title="长按拖动排序" onpointerdown="todoPointerStart(event,'${kind}','${t.id}','done')"><i class="ti ti-grip-vertical"></i></span>
+        <div class="todo-cb done" onclick="toggleTodo('${kind}','${t.id}')"><i class="ti ti-check"></i></div>
+        <div class="todo-text done" data-todo-kind="${kind}" data-todo-id="${t.id}" onclick="editTodo('${kind}','${t.id}')">${esc(t.text)}</div>
+        <button class="todo-del" onclick="deleteTodo('${kind}','${t.id}')" title="删除"><i class="ti ti-x" style="font-size:12px"></i></button>
       </div>`;
     });
   }
@@ -1219,7 +1324,7 @@ let cloudTimer = null;
 const GIST_FILE = 'mpl-data.json';
 const GH_API    = 'https://api.github.com';
 
-function allData() { return { notes, summaries, dayBg, todos, TAGS }; }
+function allData() { return { notes, summaries, dayBg, todos, weekTodos, TAGS }; }
 
 function applyData(d) {
   if (!d) return;
@@ -1227,6 +1332,7 @@ function applyData(d) {
   if (d.summaries)             { summaries=d.summaries; saveSums();  }
   if (d.dayBg)                 { dayBg=d.dayBg;         saveBg();    }
   if (d.todos)                 { todos=d.todos;          saveTodos(); }
+  if (d.weekTodos)             { weekTodos=d.weekTodos;  saveWeekTodos(); }
   if (d.TAGS && d.TAGS.length) { TAGS=d.TAGS;            saveTags();  }
 }
 
