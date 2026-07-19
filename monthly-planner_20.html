@@ -994,14 +994,30 @@ function weekStart(d=today) {
   s.setDate(s.getDate()-((s.getDay()+6)%7));
   return s;
 }
-function weekTodoMk() {
-  const s=weekStart();
+function weekTodoMk(d=today) {
+  const s=weekStart(d);
   return `${s.getFullYear()}-${s.getMonth()+1}-${s.getDate()}`;
+}
+function prevWeekTodoMk() {
+  const p=weekStart();
+  p.setDate(p.getDate()-7);
+  return weekTodoMk(p);
 }
 function weekTodoLabel() {
   const s=weekStart(), e=new Date(s);
   e.setDate(s.getDate()+6);
   return `${s.getMonth()+1}月${s.getDate()}日 - ${e.getMonth()+1}月${e.getDate()}日`;
+}
+function carryPendingWeekTodos() {
+  const key=weekTodoMk(), prevKey=prevWeekTodoMk();
+  if(Object.prototype.hasOwnProperty.call(weekTodos,key)) return;
+  const pending=(weekTodos[prevKey]||[]).filter(t=>!t.done);
+  weekTodos[key]=pending.map((t,i)=>({
+    id:`t${Date.now()}_${i}`,
+    text:t.text,
+    done:false
+  }));
+  saveWeekTodos();
 }
 function todoConfig(kind) {
   if(kind==='week') return {
@@ -1218,7 +1234,10 @@ function renderTodos() {
   const showWeekTodo=cur.getFullYear()===today.getFullYear() && cur.getMonth()===today.getMonth();
   const weekSection=document.getElementById('week-todo-section');
   if(weekSection) weekSection.hidden=!showWeekTodo;
-  if(showWeekTodo) renderTodoSection('week');
+  if(showWeekTodo) {
+    carryPendingWeekTodos();
+    renderTodoSection('week');
+  }
   renderTodoSection('month');
 }
 function renderTodoSection(kind) {
