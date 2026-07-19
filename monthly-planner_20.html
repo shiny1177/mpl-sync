@@ -122,6 +122,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
   padding:16px;box-shadow:var(--sh);position:sticky;top:20px;
 }
 .todo-section+.todo-section{margin-top:18px;padding-top:16px;border-top:.5px solid var(--todo-bd)}
+.todo-section[hidden]{display:none!important}
 .todo-title{font-size:14px;font-weight:600;color:var(--todo-ac);margin-bottom:4px;display:flex;align-items:center;gap:6px}
 .todo-month{font-size:11px;color:var(--todo-ac);opacity:.7;margin-bottom:12px}
 
@@ -399,7 +400,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
 
     <!-- right: todo aside -->
     <div class="todo-aside">
-      <div class="todo-section">
+      <div class="todo-section" id="week-todo-section">
         <div class="todo-title"><i class="ti ti-list-check" style="font-size:16px"></i>本周待办</div>
         <div class="todo-month" id="week-todo-lbl"></div>
         <div class="todo-add-row">
@@ -1214,7 +1215,10 @@ document.addEventListener('pointercancel',todoPointerEnd);
 document.addEventListener('pointermove',todoPointerMove,{passive:false});
 
 function renderTodos() {
-  renderTodoSection('week');
+  const showWeekTodo=cur.getFullYear()===today.getFullYear() && cur.getMonth()===today.getMonth();
+  const weekSection=document.getElementById('week-todo-section');
+  if(weekSection) weekSection.hidden=!showWeekTodo;
+  if(showWeekTodo) renderTodoSection('week');
   renderTodoSection('month');
 }
 function renderTodoSection(kind) {
