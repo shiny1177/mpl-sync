@@ -76,7 +76,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
 .dnum{font-size:12px;font-weight:500;color:var(--ts);line-height:1;margin-bottom:4px}
 /* items inside each day */
 .day-items{display:flex;flex-direction:column;gap:3px}
-.day-item-line{display:flex;align-items:flex-start;gap:4px}
+.day-item-line{display:flex;align-items:flex-start;gap:4px;cursor:grab;touch-action:pan-y}
+.day-item-line:active{cursor:grabbing}
+.day-item-line.plan-dragging{opacity:.38}
+.dc.plan-drop-target{box-shadow:0 0 0 2px var(--ac)!important;border-color:var(--ac)}
 .di-chip{
   display:inline-block;font-size:9px;padding:1px 5px;border-radius:8px;
   font-weight:600;white-space:nowrap;flex-shrink:0;line-height:1.5;margin-top:1px;
@@ -708,15 +711,22 @@ function render() {
     const isWknd=dow===0||dow===6, isSel=selDays.has(k), bgId=dayBg[k];
     const bgStyle=bgId?`background:${bgV(bgId)};`:'';
     const click=selMode?'':` onclick="openNote(${d})"`;
-    const itemsHtml=rows.map(row=>{
+    const itemsHtml=rows.map((row,index)=>{
       const t=row.tag?TAGS.find(x=>x.id===row.tag):null;
-      return `<div class="day-item-line">
+      return `<div class="day-item-line" draggable="true"
+        ondragstart="calendarPlanDragStart(event,'${k}',${index})"
+        ondragend="calendarPlanDragEnd()"
+        onpointerdown="calendarPlanPointerStart(event,'${k}',${index})">
         ${t?`<span class="di-chip" style="color:${tC(t)};background:${tB(t)}">${t.label}</span>`:''}
         <span class="di-text">${esc(row.text||'')}</span>
       </div>`;
     }).join('');
     html+=`<div class="dc${isToday?' today':''}${rows.length?' has-note':''}${isWknd?' wknd':''}${selMode?' sel-mode':''}${isSel?' picked':''}"
-      data-day="${d}" style="${bgStyle}"${click} role="button" aria-label="${m+1}月${d}日">
+      data-day="${d}" style="${bgStyle}"${click}
+      ondragover="calendarDayDragOver(event,${d})"
+      ondragleave="calendarDayDragLeave(event)"
+      ondrop="calendarDayDrop(event,${d})"
+      role="button" aria-label="${m+1}月${d}日">
       <div class="dnum">${d}</div>
       <div class="day-items">${itemsHtml}</div>
     </div>`;
@@ -1486,6 +1496,92 @@ function openCloud() {
   document.getElementById('cloud-ov').classList.add('on');
 }
 function closeCloud() { document.getElementById('cloud-ov').classList.remove('on'); }
+
+// ─── Move calendar plans between days ─────────────────────────────────────
+let calendarPlanDrag = null;
+let calendarPlanPressTimer = null;
+let calendarPlanTouchActive = false;
+let calendarPlanSuppressClickUntil = 0;
+
+function calendarPlanDragStart(e, sourceKey, index) {
+  if (selMode || !notes[sourceKey]?.[index]) { e.preventDefault(); return; }
+  calendarPlanDrag = {sourceKey, index};
+  const planEl = e.currentTarget;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', `${sourceKey}:${index}`);
+  e.stopPropagation();
+  setTimeout(() => planEl.classList.add('plan-dragging'), 0);
+}
+function calendarPlanDragEnd() {
+  calendarPlanDrag = null;
+  document.querySelectorAll('.day-item-line').forEach(el => el.classList.remove('plan-dragging'));
+  document.querySelectorAll('.dc').forEach(el => el.classList.remove('plan-drop-target'));
+}
+function calendarDayDragOver(e, day) {
+  if (!calendarPlanDrag || selMode) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const targetKey = nk(cur.getFullYear(), cur.getMonth(), day);
+  e.currentTarget.classList.toggle('plan-drop-target', targetKey !== calendarPlanDrag.sourceKey);
+}
+function calendarDayDragLeave(e) { e.currentTarget.classList.remove('plan-drop-target'); }
+function calendarDayDrop(e, day) {
+  if (!calendarPlanDrag) return;
+  e.preventDefault();
+  moveCalendarPlanTo(day);
+}
+function moveCalendarPlanTo(day) {
+  const drag = calendarPlanDrag;
+  calendarPlanDrag = null;
+  if (!drag) return;
+  const targetKey = nk(cur.getFullYear(), cur.getMonth(), day);
+  if (targetKey === drag.sourceKey) { calendarPlanDragEnd(); return; }
+  const source = notes[drag.sourceKey];
+  const item = source?.[drag.index];
+  if (!item) { calendarPlanDragEnd(); return; }
+  source.splice(drag.index, 1);
+  if (!source.length) delete notes[drag.sourceKey];
+  (notes[targetKey] ||= []).push(item);
+  saveNotes();
+  calendarPlanSuppressClickUntil = Date.now() + 500;
+  render();
+}
+function calendarPlanPointerStart(e, sourceKey, index) {
+  if (e.pointerType === 'mouse' || selMode || !notes[sourceKey]?.[index]) return;
+  const planEl = e.currentTarget;
+  clearTimeout(calendarPlanPressTimer);
+  calendarPlanPressTimer = setTimeout(() => {
+    calendarPlanDrag = {sourceKey, index};
+    calendarPlanTouchActive = true;
+    planEl.classList.add('plan-dragging');
+    document.body.style.userSelect = 'none';
+  }, 450);
+}
+function calendarPlanPointerMove(e) {
+  if (!calendarPlanTouchActive || !calendarPlanDrag) return;
+  e.preventDefault();
+  const cell = document.elementFromPoint(e.clientX, e.clientY)?.closest('.dc[data-day]');
+  document.querySelectorAll('.dc').forEach(el => el.classList.remove('plan-drop-target'));
+  if (!cell) return;
+  const targetKey = nk(cur.getFullYear(), cur.getMonth(), Number(cell.dataset.day));
+  if (targetKey !== calendarPlanDrag.sourceKey) cell.classList.add('plan-drop-target');
+}
+function calendarPlanPointerEnd(e) {
+  clearTimeout(calendarPlanPressTimer);
+  calendarPlanPressTimer = null;
+  if (!calendarPlanTouchActive) return;
+  const cell = document.elementFromPoint(e.clientX, e.clientY)?.closest('.dc[data-day]');
+  calendarPlanTouchActive = false;
+  document.body.style.userSelect = '';
+  if (cell) moveCalendarPlanTo(Number(cell.dataset.day));
+  else calendarPlanDragEnd();
+}
+document.addEventListener('pointermove', calendarPlanPointerMove, {passive:false});
+document.addEventListener('pointerup', calendarPlanPointerEnd);
+document.addEventListener('pointercancel', calendarPlanPointerEnd);
+document.addEventListener('click', e => {
+  if (Date.now() < calendarPlanSuppressClickUntil) { e.preventDefault(); e.stopPropagation(); }
+}, true);
 
 // ─── Keyboard ─────────────────────────────────────────────────────────────
 document.addEventListener('keydown',e=>{
