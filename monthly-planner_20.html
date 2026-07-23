@@ -713,8 +713,10 @@ function render() {
     const click=selMode?'':` onclick="openNote(${d})"`;
     const itemsHtml=rows.map((row,index)=>{
       const t=row.tag?TAGS.find(x=>x.id===row.tag):null;
-      return `<div class="day-item-line" draggable="true"
+      return `<div class="day-item-line" draggable="true" data-plan-key="${k}" data-plan-index="${index}"
         ondragstart="calendarPlanDragStart(event,'${k}',${index})"
+        ondragover="calendarPlanRowDragOver(event,'${k}',${index})"
+        ondrop="calendarPlanRowDrop(event,'${k}',${index})"
         ondragend="calendarPlanDragEnd()"
         onpointerdown="calendarPlanPointerStart(event,'${k}',${index})">
         ${t?`<span class="di-chip" style="color:${tC(t)};background:${tB(t)}">${t.label}</span>`:''}
@@ -1525,10 +1527,34 @@ function calendarDayDragOver(e, day) {
   e.currentTarget.classList.toggle('plan-drop-target', targetKey !== calendarPlanDrag.sourceKey);
 }
 function calendarDayDragLeave(e) { e.currentTarget.classList.remove('plan-drop-target'); }
+function calendarPlanRowDragOver(e, targetKey, targetIndex) {
+  if (!calendarPlanDrag || calendarPlanDrag.sourceKey !== targetKey) return;
+  e.preventDefault();
+  e.stopPropagation();
+  reorderCalendarPlan(targetKey, targetIndex);
+}
+function calendarPlanRowDrop(e, targetKey, targetIndex) {
+  if (!calendarPlanDrag || calendarPlanDrag.sourceKey !== targetKey) return;
+  e.preventDefault();
+  e.stopPropagation();
+  calendarPlanDragEnd();
+}
 function calendarDayDrop(e, day) {
   if (!calendarPlanDrag) return;
   e.preventDefault();
   moveCalendarPlanTo(day);
+}
+function reorderCalendarPlan(targetKey, targetIndex) {
+  const drag = calendarPlanDrag;
+  if (!drag || drag.sourceKey !== targetKey || drag.index === targetIndex) return;
+  const rows = notes[targetKey];
+  const item = rows?.[drag.index];
+  if (!item) return;
+  rows.splice(drag.index, 1);
+  rows.splice(targetIndex, 0, item);
+  calendarPlanDrag = {sourceKey:targetKey, index:targetIndex};
+  saveNotes();
+  render();
 }
 function moveCalendarPlanTo(day) {
   const drag = calendarPlanDrag;
@@ -1561,7 +1587,12 @@ function calendarPlanPointerMove(e) {
   if (!calendarPlanTouchActive || !calendarPlanDrag) return;
   e.preventDefault();
   const cell = document.elementFromPoint(e.clientX, e.clientY)?.closest('.dc[data-day]');
+  const plan = document.elementFromPoint(e.clientX, e.clientY)?.closest('.day-item-line[data-plan-key]');
   document.querySelectorAll('.dc').forEach(el => el.classList.remove('plan-drop-target'));
+  if (plan && plan.dataset.planKey === calendarPlanDrag.sourceKey) {
+    reorderCalendarPlan(plan.dataset.planKey, Number(plan.dataset.planIndex));
+    return;
+  }
   if (!cell) return;
   const targetKey = nk(cur.getFullYear(), cur.getMonth(), Number(cell.dataset.day));
   if (targetKey !== calendarPlanDrag.sourceKey) cell.classList.add('plan-drop-target');
