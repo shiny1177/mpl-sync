@@ -8,7 +8,7 @@
 <style>
 :root{
   --bg:#f7f6f3;--surface:#fff;--sf2:#f0ede8;
-  --bd:#e2ddd7;--bd2:#c9c3bb;
+  --bd:#e2ddd7;--bd2:#c9c3bb;--wknd-bg:#f2f2f2;
   --tp:#1a1714;--ts:#6b6560;--tm:#a09890;
   --ac:#3c5a9a;--acbg:#eef1f9;--actl:#2a4080;
   --r:10px;--sh:0 1px 3px rgba(0,0,0,.06),0 4px 12px rgba(0,0,0,.04);
@@ -16,7 +16,7 @@
 }
 [data-theme="dark"]{
   --bg:#141210;--surface:#1e1c19;--sf2:#252220;
-  --bd:#302c28;--bd2:#46413b;
+  --bd:#302c28;--bd2:#46413b;--wknd-bg:#242424;
   --tp:#f0ece6;--ts:#9a9088;--tm:#6a6260;
   --ac:#7b9dd4;--acbg:#1e2535;--actl:#a0bcec;
   --sh:0 1px 3px rgba(0,0,0,.3),0 4px 12px rgba(0,0,0,.2);
@@ -67,7 +67,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
 .dc.empty{background:transparent;border-color:transparent;box-shadow:none;cursor:default}
 .dc.has-note{border-color:var(--bd2)}
 .dc.today{border-color:var(--ac);border-width:1.5px;box-shadow:var(--sh)}
-.dc.wknd .dnum{color:var(--tm)}
+.dc.wknd{background:var(--wknd-bg)}
 .dc.today .dnum{color:var(--actl);font-weight:700}
 .dc.sel-mode{cursor:crosshair}
 .dc.sel-mode:hover{box-shadow:0 0 0 2px var(--ac)}
@@ -388,8 +388,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
         <button class="sb-clear" onclick="clearSel()">取消选择</button>
       </div>
       <div class="wk-row">
-        <div class="wk-lbl">日</div><div class="wk-lbl">一</div><div class="wk-lbl">二</div>
-        <div class="wk-lbl">三</div><div class="wk-lbl">四</div><div class="wk-lbl">五</div><div class="wk-lbl">六</div>
+        <div class="wk-lbl">一</div><div class="wk-lbl">二</div><div class="wk-lbl">三</div>
+        <div class="wk-lbl">四</div><div class="wk-lbl">五</div><div class="wk-lbl">六</div><div class="wk-lbl">日</div>
       </div>
       <div class="day-grid" id="grid"
         onmousedown="gMD(event)" onmouseover="gMO(event)" onmouseup="gMU()"></div>
@@ -702,13 +702,13 @@ function render() {
   document.getElementById('cal-msub').textContent=`${y}年第${m+1}个月 · ${new Date(y,m+1,0).getDate()}天`;
 
   // 先渲染格子，保证月份切换时日期始终正确
-  const first=new Date(y,m,1).getDay(), days=new Date(y,m+1,0).getDate();
+  const first=(new Date(y,m,1).getDay()+6)%7, days=new Date(y,m+1,0).getDate();
   let html='';
   for(let i=0;i<first;i++) html+=`<div class="dc empty"></div>`;
   for(let d=1;d<=days;d++){
     const k=nk(y,m,d), rows=notes[k]||[], dow=(first+d-1)%7;
     const isToday=today.getFullYear()===y&&today.getMonth()===m&&today.getDate()===d;
-    const isWknd=dow===0||dow===6, isSel=selDays.has(k), bgId=dayBg[k];
+    const isWknd=dow===5||dow===6, isSel=selDays.has(k), bgId=dayBg[k];
     const bgStyle=bgId?`background:${bgV(bgId)};`:'';
     const click=selMode?'':` onclick="openNote(${d})"`;
     const itemsHtml=rows.map((row,index)=>{
