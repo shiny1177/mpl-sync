@@ -64,7 +64,6 @@
 
         <div class="week-tools"><span>本周行动</span><div><button class="batch-toggle" id="toggleBatch">批量管理</button><button class="batch-delete" id="batchDelete" disabled>删除已选</button></div></div>
         <section class="week-grid" id="weekGrid" aria-label="本周计划"></section>
-        <button class="floating-add" id="openModalBottom"><span>+</span> 添加一项计划</button>
         <section class="daily-schedule" aria-label="每日时间表">
           <div class="section-heading"><div><p class="eyebrow">DAILY RHYTHM</p><h2>每天的时间表</h2></div><span class="schedule-hint">点击每个时段，写下你要做的事</span></div>
           <div class="daily-timeline" id="dailyTimeline"></div>
@@ -165,7 +164,7 @@ function fillActionOptions(){const goal=goals.find(g=>g.id===+$('#taskGoal').val
 function openTask(day=0,goal){editingTask=null;chosenDay=day;$('#taskDay').value=day;$('#taskName').value='';$('#repeatType').value='once';$('#repeatType').disabled=false;$('#weekdayPicker').classList.remove('show');$('#taskDialogTitle').textContent='安排行动项';$('#taskSaveButton').textContent='加入本周计划';$('#editTaskHint').hidden=true;fillGoalOptions(goal);taskDialog.showModal();setTimeout(()=>$('#taskName').focus(),50)}
 function openTaskEditor(task){editingTask=task;const day=tasks.findIndex(items=>items.includes(task));chosenDay=day<0?0:day;$('#taskDay').value=chosenDay;fillGoalOptions(task.goal);$('#taskAction').value=task.actionName||task.text||'';$('#taskName').value=task.text;$('#repeatType').value='once';$('#repeatType').disabled=true;$('#weekdayPicker').classList.remove('show');$('#taskDialogTitle').textContent='编辑行动项';$('#taskSaveButton').textContent='保存修改';$('#editTaskHint').hidden=false;taskDialog.showModal();setTimeout(()=>$('#taskName').focus(),50)}
 
-$('#openModal').onclick=()=>openTask();$('#openModalBottom').onclick=()=>openTask();$('#openGoalTableModal').onclick=()=>openGoal();
+$('#openModal').onclick=()=>openTask();$('#openGoalTableModal').onclick=()=>openGoal();
 document.querySelectorAll('[data-close]').forEach(btn=>btn.onclick=()=>document.getElementById(btn.dataset.close).close());
 $('#taskDay').innerHTML=labels.map((l,i)=>`<option value="${i}">${l} · ${numbers[i]}日</option>`).join('');
 $('#weekdayChoices').innerHTML=labels.map((l,i)=>`<label><input type="checkbox" value="${i}"><span>${l.slice(1)}</span></label>`).join('');
