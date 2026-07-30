@@ -484,10 +484,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
         <div class="cloud-avatar"><i class="ti ti-brand-github" style="font-size:18px"></i></div>
         <div class="cloud-user-info">
           <div class="cloud-user-name" id="cloud-user-name">已连接 GitHub</div>
-          <div class="cloud-user-sub" id="cloud-user-sub">数据变动后自动同步</div>
+          <div class="cloud-user-sub" id="cloud-user-sub">先下载云端版本，再安全同步</div>
         </div>
       </div>
-      <div id="cloud-status" class="cloud-status ok" style="display:flex"><i class="ti ti-check" style="font-size:14px"></i>已连接，数据变动后3秒自动同步</div>
+      <div id="cloud-status" class="cloud-status ok" style="display:flex"><i class="ti ti-check" style="font-size:14px"></i>已连接，检测到云端更新时不会自动覆盖</div>
+      <div id="cloud-conflict" class="cloud-status err" style="display:none;flex-direction:column;align-items:stretch;gap:8px">
+        <span>云端数据已在其他设备更新。请选择保留哪一份：</span>
+        <div style="display:flex;gap:8px">
+          <button class="cloud-btn" onclick="useCloudVersion()"><i class="ti ti-download" style="font-size:13px"></i> 使用云端版本</button>
+          <button class="cloud-btn" style="color:#c0392b;border-color:#e8b4b4" onclick="keepLocalVersion()"><i class="ti ti-upload" style="font-size:13px"></i> 保留本机版本</button>
+        </div>
+      </div>
       <div class="cloud-actions">
         <button class="cloud-btn" onclick="cloudPush(true)"><i class="ti ti-upload" style="font-size:13px"></i> 立即上传</button>
         <button class="cloud-btn" onclick="cloudPull(true)"><i class="ti ti-download" style="font-size:13px"></i> 从云端还原</button>
@@ -1001,6 +1008,17 @@ function autoSaveTheme(el) {
 
 // ─── TODO list ────────────────────────────────────────────────────────────
 function todoMk() { return mk(cur.getFullYear(),cur.getMonth()); }
+function prevTodoMk() {
+  const d=new Date(cur.getFullYear(),cur.getMonth()-1,1);
+  return mk(d.getFullYear(),d.getMonth());
+}
+function carryPendingMonthlyTodos() {
+  const key=todoMk();
+  if(Object.prototype.hasOwnProperty.call(todos,key)) return;
+  const pending=(todos[prevTodoMk()]||[]).filter(t=>!t.done);
+  todos[key]=pending.map((t,i)=>({ id:`t${Date.now()}_${i}`, text:t.text, done:false }));
+  saveTodos();
+}
 function weekStart(d=today) {
   const s=new Date(d.getFullYear(),d.getMonth(),d.getDate());
   s.setDate(s.getDate()-((s.getDay()+6)%7));
@@ -1243,6 +1261,7 @@ document.addEventListener('pointercancel',todoPointerEnd);
 document.addEventListener('pointermove',todoPointerMove,{passive:false});
 
 function renderTodos() {
+  carryPendingMonthlyTodos();
   const showWeekTodo=cur.getFullYear()===today.getFullYear() && cur.getMonth()===today.getMonth();
   const weekSection=document.getElementById('week-todo-section');
   if(weekSection) weekSection.hidden=!showWeekTodo;
@@ -1334,6 +1353,10 @@ let ghUser  = localStorage.getItem('mpl-gh-user')  || '';
 let ghToken = localStorage.getItem('mpl-gh-token') || '';
 let ghGist  = localStorage.getItem('mpl-gh-gist')  || '';
 let cloudTimer = null;
+let cloudReady = !(ghToken && ghGist);
+let cloudApplyingData = false;
+let cloudRevision = '';
+let cloudConflict = null;
 
 const GIST_FILE = 'mpl-data.json';
 const GH_API    = 'https://api.github.com';
@@ -1342,12 +1365,25 @@ function allData() { return { notes, summaries, dayBg, todos, weekTodos, TAGS };
 
 function applyData(d) {
   if (!d) return;
-  if (d.notes)                 { notes=d.notes;         saveNotes(); }
-  if (d.summaries)             { summaries=d.summaries; saveSums();  }
-  if (d.dayBg)                 { dayBg=d.dayBg;         saveBg();    }
-  if (d.todos)                 { todos=d.todos;          saveTodos(); }
-  if (d.weekTodos)             { weekTodos=d.weekTodos;  saveWeekTodos(); }
-  if (d.TAGS && d.TAGS.length) { TAGS=d.TAGS;            saveTags();  }
+  cloudApplyingData=true;
+  try {
+    if (d.notes)                 { notes=d.notes;         saveNotes(); }
+    if (d.summaries)             { summaries=d.summaries; saveSums();  }
+    if (d.dayBg)                 { dayBg=d.dayBg;         saveBg();    }
+    if (d.todos)                 { todos=d.todos;          saveTodos(); }
+    if (d.weekTodos)             { weekTodos=d.weekTodos;  saveWeekTodos(); }
+    if (d.TAGS && d.TAGS.length) { TAGS=d.TAGS;            saveTags();  }
+  } finally { cloudApplyingData=false; }
+}
+
+function gistRevision(gist) { return gist.history?.[0]?.version || gist.updated_at || ''; }
+function backupFileName() { return `mpl-backup-${new Date().toISOString().replace(/[:.]/g,'-')}.json`; }
+function backupChanges(gist) {
+  const files=gist.files||{}, changes={}, content=files[GIST_FILE]?.content;
+  if (content) changes[backupFileName()]={content};
+  const backups=Object.keys(files).filter(name=>name.startsWith('mpl-backup-')).sort();
+  backups.slice(0,Math.max(0,backups.length-19)).forEach(name=>{ changes[name]=null; });
+  return changes;
 }
 
 function ghHeaders() {
@@ -1386,6 +1422,7 @@ async function connectGH() {
     localStorage.setItem('mpl-gh-user',  ghUser);
     localStorage.setItem('mpl-gh-token', ghToken);
     localStorage.setItem('mpl-gh-gist',  ghGist);
+    cloudReady=false;
     setSyncDot('ok');
     await cloudPull();
     updateCloudUI();
@@ -1411,16 +1448,24 @@ async function findOrCreateGist() {
   return j.id;
 }
 
-async function cloudPush(manual=false) {
-  if (!ghToken || !ghGist) return;
+async function cloudPush(manual=false, force=false) {
+  if (!ghToken || !ghGist || (!cloudReady && !force)) return;
   setSyncDot('ing');
   try {
+    const latest=await fetch(`${GH_API}/gists/${ghGist}`, { headers: ghHeaders() });
+    if (!latest.ok) throw new Error(`HTTP ${latest.status}`);
+    const latestGist=await latest.json();
+    const latestRevision=gistRevision(latestGist);
+    if (!force && (!cloudRevision || latestRevision!==cloudRevision)) {
+      cloudConflict={latestRevision}; cloudReady=false; setSyncDot('err'); showCloudConflict(); return;
+    }
     const r = await fetch(`${GH_API}/gists/${ghGist}`, {
       method: 'PATCH',
       headers: { 'Authorization':'Bearer '+ghToken, 'Accept':'application/vnd.github+json', 'Content-Type':'application/json' },
-      body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(allData()) } } })
+      body: JSON.stringify({ files: { ...backupChanges(latestGist), [GIST_FILE]: { content: JSON.stringify(allData()) } } })
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    cloudRevision=gistRevision(await r.json()); cloudReady=true; cloudConflict=null; hideCloudConflict();
     setSyncDot('ok');
     const t = new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
     showStatus('cloud-status',`已同步 · ${t}`,'ok');
@@ -1432,8 +1477,17 @@ async function cloudPush(manual=false) {
   }
 }
 
+function showCloudConflict() {
+  const el=document.getElementById('cloud-conflict'); if (el) el.style.display='block';
+  showStatus('cloud-status','云端已有其他设备的更新，已暂停上传。请选择要保留的版本。','err');
+}
+function hideCloudConflict() { const el=document.getElementById('cloud-conflict'); if (el) el.style.display='none'; }
+function useCloudVersion() { hideCloudConflict(); cloudPull(true); }
+function keepLocalVersion() { if (cloudConflict) cloudPush(true,true); }
+
 async function cloudPull(manual=false) {
   if (!ghToken || !ghGist) return;
+  cloudReady=false;
   setSyncDot('ing');
   try {
     const r = await fetch(`${GH_API}/gists/${ghGist}`, {
@@ -1444,21 +1498,25 @@ async function cloudPull(manual=false) {
     const content = j.files?.[GIST_FILE]?.content;
     if (content) {
       applyData(JSON.parse(content));
+      cloudRevision=gistRevision(j); cloudReady=true;
       render(); loadTheme(); renderTodos(); renderSummary(); renderLegend();
     }
+    else { cloudRevision=gistRevision(j); cloudReady=true; }
+    cloudConflict=null; hideCloudConflict();
     setSyncDot('ok');
     const t = new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
     showStatus('cloud-status',`已同步 · ${t}`,'ok');
     localStorage.setItem('mpl-last-sync', new Date().toISOString());
     updateCloudSub();
   } catch(e) {
+    cloudReady=false;
     setSyncDot('err');
-    if (manual) showStatus('cloud-status','还原失败：'+e.message,'err');
+    showStatus('cloud-status','同步失败，已暂停上传：'+e.message,'err');
   }
 }
 
 function scheduleSync() {
-  if (!ghToken || !ghGist) return;
+  if (!ghToken || !ghGist || !cloudReady || cloudApplyingData) return;
   clearTimeout(cloudTimer);
   cloudTimer = setTimeout(()=>cloudPush(), 3000);
 }
@@ -1474,6 +1532,7 @@ function updateCloudSub() {
 function disconnectCloud() {
   if (!confirm('确认断开云同步？本地数据不受影响。')) return;
   ghUser=''; ghToken=''; ghGist='';
+  cloudReady=true; cloudRevision=''; cloudConflict=null; hideCloudConflict();
   localStorage.removeItem('mpl-gh-user');
   localStorage.removeItem('mpl-gh-token');
   localStorage.removeItem('mpl-gh-gist');
@@ -1627,7 +1686,7 @@ if(window.matchMedia('(prefers-color-scheme:dark)').matches){
 }
 render(); loadTheme(); renderTodos(); renderSummary();
 
-if (ghToken && ghGist) { setSyncDot('ok'); cloudPull(); }
+if (ghToken && ghGist) { cloudReady=false; setSyncDot('ing'); cloudPull(); }
 </script>
 </body>
 </html>
