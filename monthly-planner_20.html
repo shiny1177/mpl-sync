@@ -407,7 +407,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
         <div class="todo-title"><i class="ti ti-list-check" style="font-size:16px"></i>本周待办</div>
         <div class="todo-month" id="week-todo-lbl"></div>
         <div class="todo-add-row">
-          <input class="todo-inp" id="week-todo-inp" type="text" placeholder="添加一件本周待办…" maxlength="60"
+          <input class="todo-inp" id="week-todo-inp" type="text" placeholder="添加一件本周待办…" maxlength="60" autocomplete="off"
             onkeydown="if(event.key==='Enter')addWeekTodo()">
           <button class="todo-add-btn" onclick="addWeekTodo()" title="添加"><i class="ti ti-plus"></i></button>
         </div>
@@ -418,7 +418,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
         <div class="todo-title"><i class="ti ti-checklist" style="font-size:16px"></i>本月待办</div>
         <div class="todo-month" id="todo-month-lbl"></div>
         <div class="todo-add-row">
-          <input class="todo-inp" id="todo-inp" type="text" placeholder="添加一件本月待办…" maxlength="60"
+          <input class="todo-inp" id="todo-inp" type="text" placeholder="添加一件本月待办…" maxlength="60" autocomplete="off"
             onkeydown="if(event.key==='Enter')addTodo()">
           <button class="todo-add-btn" onclick="addTodo()" title="添加"><i class="ti ti-plus"></i></button>
         </div>
@@ -465,7 +465,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
       <p class="cloud-desc">用你的 GitHub 账号同步数据，免费，国内可访问。只需填入 Token，所有设备用同一个 Token 即可同步。</p>
       <div class="cloud-field">
         <div class="cloud-label">GitHub 用户名</div>
-        <input class="cloud-inp" id="gh-user" placeholder="例如 shiny1177" autocomplete="off" value="shiny1177">
+        <input class="cloud-inp" id="gh-user" placeholder="例如 shiny1177" autocomplete="username">
       </div>
       <div class="cloud-field">
         <div class="cloud-label">Personal Access Token（ghp_ 开头，不要泄露）</div>
@@ -582,6 +582,7 @@ let notes     = JSON.parse(localStorage.getItem('mpl-notes')     || '{}');
 let summaries = JSON.parse(localStorage.getItem('mpl-summaries') || '{}');
 let dayBg     = JSON.parse(localStorage.getItem('mpl-daybg')     || '{}');
 let todos     = JSON.parse(localStorage.getItem('mpl-todos')     || '{}');
+let todoCarry = JSON.parse(localStorage.getItem('mpl-todo-carry') || '{}');
 let weekTodos = JSON.parse(localStorage.getItem('mpl-week-todos') || '{}');
 
 const today  = new Date();
@@ -599,6 +600,7 @@ const saveNotes = () => { localStorage.setItem('mpl-notes',     JSON.stringify(n
 const saveSums  = () => { localStorage.setItem('mpl-summaries', JSON.stringify(summaries)); scheduleSync(); };
 const saveBg    = () => { localStorage.setItem('mpl-daybg',     JSON.stringify(dayBg));     scheduleSync(); };
 const saveTodos = () => { localStorage.setItem('mpl-todos',     JSON.stringify(todos));     scheduleSync(); };
+const saveTodoCarry = () => { localStorage.setItem('mpl-todo-carry', JSON.stringify(todoCarry)); scheduleSync(); };
 const saveWeekTodos = () => { localStorage.setItem('mpl-week-todos', JSON.stringify(weekTodos)); scheduleSync(); };
 
 const nk   = (y,m,d) => `${y}-${m+1}-${d}`;
@@ -1013,11 +1015,17 @@ function prevTodoMk() {
   return mk(d.getFullYear(),d.getMonth());
 }
 function carryPendingMonthlyTodos() {
+  if(cur.getFullYear()!==today.getFullYear() || cur.getMonth()!==today.getMonth()) return;
   const key=todoMk();
-  if(Object.prototype.hasOwnProperty.call(todos,key)) return;
-  const pending=(todos[prevTodoMk()]||[]).filter(t=>!t.done);
-  todos[key]=pending.map((t,i)=>({ id:`t${Date.now()}_${i}`, text:t.text, done:false }));
+  if(todoCarry[key]) return;
+  const prevKey=prevTodoMk();
+  const pending=(todos[prevKey]||[]).filter(t=>!t.done);
+  const carried=pending.map((t,i)=>({ id:`t${Date.now()}_${i}`, text:t.text, done:false }));
+  todos[key]=[...carried,...(todos[key]||[])];
+  delete todos[prevKey];
+  todoCarry[key]=true;
   saveTodos();
+  saveTodoCarry();
 }
 function weekStart(d=today) {
   const s=new Date(d.getFullYear(),d.getMonth(),d.getDate());
@@ -1361,7 +1369,7 @@ let cloudConflict = null;
 const GIST_FILE = 'mpl-data.json';
 const GH_API    = 'https://api.github.com';
 
-function allData() { return { notes, summaries, dayBg, todos, weekTodos, TAGS }; }
+function allData() { return { notes, summaries, dayBg, todos, todoCarry, weekTodos, TAGS }; }
 
 function applyData(d) {
   if (!d) return;
@@ -1371,6 +1379,8 @@ function applyData(d) {
     if (d.summaries)             { summaries=d.summaries; saveSums();  }
     if (d.dayBg)                 { dayBg=d.dayBg;         saveBg();    }
     if (d.todos)                 { todos=d.todos;          saveTodos(); }
+    todoCarry=('todoCarry' in d) ? d.todoCarry : {};
+    saveTodoCarry();
     if (d.weekTodos)             { weekTodos=d.weekTodos;  saveWeekTodos(); }
     if (d.TAGS && d.TAGS.length) { TAGS=d.TAGS;            saveTags();  }
   } finally { cloudApplyingData=false; }
