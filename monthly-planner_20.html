@@ -304,6 +304,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
 .cloud-btn:hover{background:var(--surface);border-color:var(--ac);color:var(--ac)}
 .cloud-btn.primary{background:var(--ac);border-color:var(--ac);color:#fff}
 .cloud-btn.primary:hover{opacity:.85}
+.cloud-btn.danger{color:#c0392b;border-color:#e8b4b4}
+.cloud-conflict-modal{background:var(--surface);border:1px solid #e6a7a0;border-radius:16px;padding:24px;width:380px;max-width:92vw;box-shadow:0 12px 48px rgba(0,0,0,.24);text-align:center;animation:pop .18s ease-out}
+.cloud-conflict-icon{width:46px;height:46px;border-radius:50%;margin:0 auto 12px;background:#fdf0f0;color:#c0392b;display:flex;align-items:center;justify-content:center;font-size:24px}
+.cloud-conflict-title{font-size:16px;font-weight:650;color:var(--tp);margin-bottom:8px}.cloud-conflict-modal p{font-size:12px;line-height:1.75;color:var(--ts);margin:0 auto 18px;max-width:300px}.cloud-conflict-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+[data-theme="dark"] .cloud-conflict-icon{background:#3b0a0a;color:#ef9a9a}
+.cloud-entry{position:relative;display:inline-flex}.cloud-entry.has-conflict #cloud-btn{color:#c0392b;background:#fdf0f0}.cloud-entry.has-conflict #cloud-btn::after{content:"";position:absolute;width:7px;height:7px;border-radius:50%;background:#d83a32;border:2px solid var(--surface);top:3px;right:3px}
+.cloud-conflict-tip{display:none;position:absolute;z-index:30;right:-8px;top:calc(100% + 10px);width:238px;padding:12px;border:1px solid #e6a7a0;border-radius:10px;background:var(--surface);box-shadow:0 8px 24px rgba(0,0,0,.16);color:var(--ts);font-size:12px;line-height:1.55}.cloud-conflict-tip.on{display:block}.cloud-conflict-tip::before{content:"";position:absolute;right:18px;top:-6px;width:10px;height:10px;background:var(--surface);border-left:1px solid #e6a7a0;border-top:1px solid #e6a7a0;transform:rotate(45deg)}
+.cloud-conflict-tip strong{position:relative;display:block;color:#c0392b;font-size:13px;margin-bottom:3px}.cloud-conflict-tip span{position:relative;display:block}.cloud-conflict-tip div{position:relative;display:flex;gap:7px;margin-top:10px}.cloud-conflict-tip button{border:0;border-radius:6px;padding:5px 9px;background:#c0392b;color:white;font:inherit;cursor:pointer}.cloud-conflict-tip button.later{background:var(--sf2);color:var(--ts);border:.5px solid var(--bd2)}
 .cloud-sep{height:.5px;background:var(--bd);margin:14px 0}
 .cloud-user{display:flex;align-items:center;gap:10px;background:var(--sf2);border-radius:var(--r);padding:10px 12px;margin-bottom:12px}
 .cloud-avatar{width:36px;height:36px;border-radius:50%;background:var(--acbg);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600;color:var(--ac);flex-shrink:0}
@@ -355,7 +363,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
   <div class="top-title">月计划表</div>
   <div class="top-acts">
     <button class="ib" id="sel-btn" onclick="toggleSelMode()" title="多选日期·设置背景色"><i class="ti ti-paint"></i></button>
-    <button class="ib" onclick="openCloud()" title="云端同步" id="cloud-btn"><i class="ti ti-cloud"></i></button>
+    <span class="cloud-entry">
+      <button class="ib" onclick="openCloud()" title="云端同步" id="cloud-btn"><i class="ti ti-cloud"></i></button>
+      <div class="cloud-conflict-tip" id="cloud-conflict-tip" role="status">
+        <strong><i class="ti ti-alert-triangle"></i> 发现同步冲突</strong>
+        <span>云端和本机都有更新，要现在处理吗？</span>
+        <div><button onclick="openCloudConflict()">现在处理</button><button class="later" onclick="dismissCloudConflictTip()">稍后</button></div>
+      </div>
+    </span>
     <button class="ib" onclick="toggleTheme()" title="切换主题"><i class="ti ti-moon-stars" id="theme-icon"></i></button>
     <button class="ib" onclick="window.print()" title="下载 PDF"><i class="ti ti-file-type-pdf"></i></button>
   </div>
@@ -505,6 +520,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
         <button class="cloud-btn" style="color:#c0392b;border-color:#e8b4b4" onclick="disconnectCloud()"><i class="ti ti-unlink" style="font-size:13px"></i> 断开同步</button>
         <button class="btn-cancel" onclick="closeCloud()">关闭</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="ov" id="cloud-conflict-ov">
+  <div class="cloud-conflict-modal" role="alertdialog" aria-modal="true" aria-labelledby="cloud-conflict-title">
+    <div class="cloud-conflict-icon"><i class="ti ti-alert-triangle"></i></div>
+    <div class="cloud-conflict-title" id="cloud-conflict-title">检测到其他设备的更新</div>
+    <p>为保护你的数据，已暂停上传。本机内容和云端内容都还在，请选择要保留的版本。</p>
+    <div class="cloud-conflict-actions">
+      <button class="cloud-btn" onclick="useCloudVersion()"><i class="ti ti-download" style="font-size:13px"></i> 使用云端版本</button>
+      <button class="cloud-btn danger" onclick="keepLocalVersion()"><i class="ti ti-upload" style="font-size:13px"></i> 保留本机版本</button>
     </div>
   </div>
 </div>
@@ -757,8 +784,8 @@ function openNote(d) {
   const dow=new Date(y,m,d).getDay();
   const existing=notes[k];
   rowItems=existing&&existing.length
-    ?existing.map(r=>({tag:r.tag||null,text:r.text||'',hadText:!!(r.text||'').trim(),emptyBuffered:false}))
-    :[{tag:TAGS[0]?TAGS[0].id:null,text:'',hadText:false,emptyBuffered:false}];
+    ?existing.map(r=>({tag:r.tag||null,text:r.text||'',hadText:!!(r.text||'').trim(),emptyBuffered:false,tagManual:r.autoTag!==true}))
+    :[{tag:TAGS[0]?TAGS[0].id:null,text:'',hadText:false,emptyBuffered:false,tagManual:false}];
   document.getElementById('note-date').textContent=`${WDS[dow]} · ${y}年${m+1}月${d}日`;
   document.getElementById('note-del').style.display=existing&&existing.length?'':'none';
   renderRows();
@@ -787,6 +814,7 @@ function renderRows() {
       </button>
       <textarea class="item-text-inp" placeholder="记录这件事…"
         oninput="rowInput(this,${i})"
+        onblur="rowAutoTag(${i})"
         onkeydown="rowKD(event,${i})"
         rows="1">${esc(r.text)}</textarea>
       <button class="item-del-btn" onclick="removeRow(${i})" style="margin-top:6px"><i class="ti ti-x"></i></button>
@@ -802,7 +830,7 @@ function autoResizeTA(el) {
 }
 
 function addRow() {
-  rowItems.push({tag:TAGS[0]?TAGS[0].id:null,text:'',hadText:false,emptyBuffered:false});
+  rowItems.push({tag:TAGS[0]?TAGS[0].id:null,text:'',hadText:false,emptyBuffered:false,tagManual:false});
   renderRows();
   const ins=document.querySelectorAll('.item-text-inp');
   if(ins.length) ins[ins.length-1].focus();
@@ -828,6 +856,17 @@ function rowInput(el,i) {
   removeRow(i);
   focusRowAfterRemoval(i);
 }
+function suggestedTag(text) {
+  const rules=[
+    {label:'健康',words:['运动','跑步','健身','瑜伽','游泳','睡眠','医院','看病','体检','牙','医保','药']},
+    {label:'事业',words:['工作','会议','项目','客户','汇报','面试','简历','公司','方案','邮件','学习','课程','考试','审批','输出','整理材料','材料','文档','合同','报销','申请','总结']},
+    {label:'个人',words:['吃饭','早餐','午餐','晚餐','买菜','购物','家务','洗衣','整理','理发','旅行','旅游','通勤']}
+  ];
+  const hit=rules.find(rule=>rule.words.some(word=>text.includes(word)));
+  return hit?TAGS.find(t=>t.label===hit.label)?.id:null;
+}
+function rowAutoTag(i) { const item=rowItems[i]; if(!item||item.tagManual||!item.text.trim())return; const tag=suggestedTag(item.text); if(tag&&item.tag!==tag){item.tag=tag;renderRows();} }
+function autoTagRows() { rowItems.forEach((_,i)=>rowAutoTag(i)); }
 function focusRowAfterRemoval(i) {
   const ins=document.querySelectorAll('.item-text-inp');
   const next=ins[Math.min(i,ins.length-1)];
@@ -923,9 +962,10 @@ document.addEventListener('pointermove',rowPointerMove,{passive:false});
 function closeNote() { document.getElementById('note-ov').classList.remove('on'); closePicker(); }
 
 function saveNote() {
+  autoTagRows();
   const k=nk(cur.getFullYear(),cur.getMonth(),editDay);
   const filtered=rowItems.filter(r=>r.text.trim());
-  if(filtered.length) notes[k]=filtered.map(r=>({tag:r.tag,text:r.text.trim()}));
+  if(filtered.length) notes[k]=filtered.map(r=>({tag:r.tag,text:r.text.trim(),autoTag:!r.tagManual}));
   else delete notes[k];
   saveNotes(); closeNote(); render();
 }
@@ -946,7 +986,7 @@ function openPicker(rowIdx, btn) {
   const rect=btn.getBoundingClientRect();
   drop.style.cssText=`display:flex;flex-direction:column;top:${rect.bottom+6}px;left:${rect.left}px`;
 }
-function pickTag(rowIdx,tagId) { rowItems[rowIdx].tag=tagId; closePicker(); renderRows(); }
+function pickTag(rowIdx,tagId) { rowItems[rowIdx].tag=tagId; rowItems[rowIdx].tagManual=true; closePicker(); renderRows(); }
 function closePicker() { document.getElementById('tp-drop').style.display='none'; openPickerRow=null; }
 document.addEventListener('click',e=>{
   if(!e.target.closest('.item-tag-btn')&&!e.target.closest('#tp-drop')) closePicker();
@@ -1489,9 +1529,13 @@ async function cloudPush(manual=false, force=false) {
 
 function showCloudConflict() {
   const el=document.getElementById('cloud-conflict'); if (el) el.style.display='block';
+  document.querySelector('.cloud-entry')?.classList.add('has-conflict');
+  document.getElementById('cloud-conflict-tip')?.classList.add('on');
   showStatus('cloud-status','云端已有其他设备的更新，已暂停上传。请选择要保留的版本。','err');
 }
-function hideCloudConflict() { const el=document.getElementById('cloud-conflict'); if (el) el.style.display='none'; }
+function hideCloudConflict() { const el=document.getElementById('cloud-conflict'); if (el) el.style.display='none'; document.getElementById('cloud-conflict-ov')?.classList.remove('on'); document.querySelector('.cloud-entry')?.classList.remove('has-conflict'); document.getElementById('cloud-conflict-tip')?.classList.remove('on'); }
+function openCloudConflict() { document.getElementById('cloud-conflict-tip')?.classList.remove('on'); document.getElementById('cloud-conflict-ov')?.classList.add('on'); }
+function dismissCloudConflictTip() { document.getElementById('cloud-conflict-tip')?.classList.remove('on'); }
 function useCloudVersion() { hideCloudConflict(); cloudPull(true); }
 function keepLocalVersion() { if (cloudConflict) cloudPush(true,true); }
 
@@ -1564,6 +1608,7 @@ function updateCloudUI() {
 
 function openCloud() {
   updateCloudUI();
+  if (cloudConflict) { openCloudConflict(); return; }
   document.getElementById('cloud-ov').classList.add('on');
 }
 function closeCloud() { document.getElementById('cloud-ov').classList.remove('on'); }
