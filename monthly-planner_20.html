@@ -859,10 +859,35 @@ function rowInput(el,i) {
   removeRow(i);
   focusRowAfterRemoval(i);
 }
+function learnedTag(text) {
+  const target=text.toLowerCase().replace(/[^\u4e00-\u9fff\da-z]/g,'');
+  if(target.length<2) return null;
+  const ignored=new Set(['今天','明天','上午','下午','晚上','需要','一下','这个','那个','事情','计划','安排']);
+  const scores={};
+  Object.values(notes).forEach(rows=>(Array.isArray(rows)?rows:[]).forEach(row=>{
+    // 只学习你亲自选过的标签，避免自动推荐自己不断强化。
+    if(!row?.tag || row.autoTag===true) return;
+    const source=(row.text||'').toLowerCase().replace(/[^\u4e00-\u9fff\da-z]/g,'');
+    if(source.length<2) return;
+    let best=0;
+    for(let len=Math.min(6,target.length,source.length);len>=2;len--){
+      for(let i=0;i<=target.length-len;i++){
+        const phrase=target.slice(i,i+len);
+        if(!ignored.has(phrase) && source.includes(phrase)){ best=len; break; }
+      }
+      if(best) break;
+    }
+    if(best) scores[row.tag]=(scores[row.tag]||0)+best*best;
+  }));
+  const best=Object.entries(scores).sort((a,b)=>b[1]-a[1])[0];
+  return best&&best[1]>=4&&TAGS.some(t=>t.id===best[0])?best[0]:null;
+}
 function suggestedTag(text) {
+  const learned=learnedTag(text);
+  if(learned) return learned;
   const rules=[
     {label:'健康',words:['运动','跑步','健身','瑜伽','游泳','睡眠','医院','看病','体检','牙','医保','药']},
-    {label:'事业',words:['工作','会议','项目','客户','汇报','面试','简历','公司','方案','邮件','学习','课程','考试','审批','输出','整理材料','材料','文档','合同','报销','申请','总结']},
+    {label:'事业',words:['工作','上班','会议','项目','客户','汇报','面试','简历','公司','方案','邮件','学习','课程','考试','审批','输出','整理材料','材料','文档','合同','报销','申请','总结']},
     {label:'个人',words:['吃饭','早餐','午餐','晚餐','买菜','购物','家务','洗衣','整理','理发','旅行','旅游','通勤']}
   ];
   const hit=rules.find(rule=>rule.words.some(word=>text.includes(word)));
