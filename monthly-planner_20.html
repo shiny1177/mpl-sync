@@ -305,13 +305,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
 .cloud-btn.primary{background:var(--ac);border-color:var(--ac);color:#fff}
 .cloud-btn.primary:hover{opacity:.85}
 .cloud-btn.danger{color:#c0392b;border-color:#e8b4b4}
-.cloud-conflict-modal{background:var(--surface);border:1px solid #e6a7a0;border-radius:16px;padding:24px;width:380px;max-width:92vw;box-shadow:0 12px 48px rgba(0,0,0,.24);text-align:center;animation:pop .18s ease-out}
+.cloud-conflict-modal{position:relative;background:var(--surface);border:1px solid #e6a7a0;border-radius:16px;padding:24px;width:380px;max-width:92vw;box-shadow:0 12px 48px rgba(0,0,0,.24);text-align:center;animation:pop .18s ease-out}
 .cloud-conflict-icon{width:46px;height:46px;border-radius:50%;margin:0 auto 12px;background:#fdf0f0;color:#c0392b;display:flex;align-items:center;justify-content:center;font-size:24px}
 .cloud-conflict-title{font-size:16px;font-weight:650;color:var(--tp);margin-bottom:8px}.cloud-conflict-modal p{font-size:12px;line-height:1.75;color:var(--ts);margin:0 auto 18px;max-width:300px}.cloud-conflict-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
 [data-theme="dark"] .cloud-conflict-icon{background:#3b0a0a;color:#ef9a9a}
 .cloud-entry{position:relative;display:inline-flex}.cloud-entry.has-conflict #cloud-btn{color:#c0392b;background:#fdf0f0}.cloud-entry.has-conflict #cloud-btn::after{content:"";position:absolute;width:7px;height:7px;border-radius:50%;background:#d83a32;border:2px solid var(--surface);top:3px;right:3px}
 .cloud-conflict-tip{display:none;position:absolute;z-index:30;right:-8px;top:calc(100% + 10px);width:238px;padding:12px;border:1px solid #e6a7a0;border-radius:10px;background:var(--surface);box-shadow:0 8px 24px rgba(0,0,0,.16);color:var(--ts);font-size:12px;line-height:1.55}.cloud-conflict-tip.on{display:block}.cloud-conflict-tip::before{content:"";position:absolute;right:18px;top:-6px;width:10px;height:10px;background:var(--surface);border-left:1px solid #e6a7a0;border-top:1px solid #e6a7a0;transform:rotate(45deg)}
 .cloud-conflict-tip strong{position:relative;display:block;color:#c0392b;font-size:13px;margin-bottom:3px}.cloud-conflict-tip span{position:relative;display:block}.cloud-conflict-tip div{position:relative;display:flex;gap:7px;margin-top:10px}.cloud-conflict-tip button{border:0;border-radius:6px;padding:5px 9px;background:#c0392b;color:white;font:inherit;cursor:pointer}.cloud-conflict-tip button.later{background:var(--sf2);color:var(--ts);border:.5px solid var(--bd2)}
+.cloud-conflict-close{position:absolute;right:10px;top:9px;border:0;background:transparent;color:var(--tm);font-size:20px;line-height:1;cursor:pointer;padding:4px}
 .cloud-sep{height:.5px;background:var(--bd);margin:14px 0}
 .cloud-user{display:flex;align-items:center;gap:10px;background:var(--sf2);border-radius:var(--r);padding:10px 12px;margin-bottom:12px}
 .cloud-avatar{width:36px;height:36px;border-radius:50%;background:var(--acbg);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600;color:var(--ac);flex-shrink:0}
@@ -524,14 +525,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
   </div>
 </div>
 
-<div class="ov" id="cloud-conflict-ov">
+<div class="ov" id="cloud-conflict-ov" onclick="if(event.target===this)closeCloudConflict()">
   <div class="cloud-conflict-modal" role="alertdialog" aria-modal="true" aria-labelledby="cloud-conflict-title">
+    <button class="cloud-conflict-close" onclick="closeCloudConflict()" aria-label="暂不处理">×</button>
     <div class="cloud-conflict-icon"><i class="ti ti-alert-triangle"></i></div>
     <div class="cloud-conflict-title" id="cloud-conflict-title">检测到其他设备的更新</div>
     <p>为保护你的数据，已暂停上传。本机内容和云端内容都还在，请选择要保留的版本。</p>
     <div class="cloud-conflict-actions">
       <button class="cloud-btn" onclick="useCloudVersion()"><i class="ti ti-download" style="font-size:13px"></i> 使用云端版本</button>
       <button class="cloud-btn danger" onclick="keepLocalVersion()"><i class="ti ti-upload" style="font-size:13px"></i> 保留本机版本</button>
+      <button class="btn-cancel" onclick="closeCloudConflict()">暂不处理</button>
     </div>
   </div>
 </div>
@@ -1535,9 +1538,10 @@ function showCloudConflict() {
 }
 function hideCloudConflict() { const el=document.getElementById('cloud-conflict'); if (el) el.style.display='none'; document.getElementById('cloud-conflict-ov')?.classList.remove('on'); document.querySelector('.cloud-entry')?.classList.remove('has-conflict'); document.getElementById('cloud-conflict-tip')?.classList.remove('on'); }
 function openCloudConflict() { document.getElementById('cloud-conflict-tip')?.classList.remove('on'); document.getElementById('cloud-conflict-ov')?.classList.add('on'); }
+function closeCloudConflict() { document.getElementById('cloud-conflict-ov')?.classList.remove('on'); }
 function dismissCloudConflictTip() { document.getElementById('cloud-conflict-tip')?.classList.remove('on'); }
-function useCloudVersion() { hideCloudConflict(); cloudPull(true); }
-function keepLocalVersion() { if (cloudConflict) cloudPush(true,true); }
+function useCloudVersion() { closeCloudConflict(); hideCloudConflict(); cloudPull(true); }
+function keepLocalVersion() { closeCloudConflict(); if (cloudConflict) cloudPush(true,true); }
 
 async function cloudPull(manual=false) {
   if (!ghToken || !ghGist) return;
