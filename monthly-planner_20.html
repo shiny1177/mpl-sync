@@ -68,6 +68,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
 .dc.has-note{border-color:var(--bd2)}
 .dc.today{border-color:var(--ac);border-width:1.5px;box-shadow:var(--sh)}
 .dc.wknd{background:var(--wknd-bg)}
+.dc.holiday-rest{border-color:#ead6b6}
+.holiday-label{display:inline-flex;align-items:center;margin-left:4px;padding:1px 4px;border-radius:6px;font-size:9px;font-weight:600;line-height:1.3;vertical-align:1px;color:#a46310;background:#fff4df}
+.holiday-label.workday{color:#52718b;background:#eaf2f8}
+.holiday-label.festival{color:#8c629f;background:#f5edf8}
+[data-theme="dark"] .holiday-label{color:#f2bd74;background:#3d2c15}[data-theme="dark"] .holiday-label.workday{color:#a9c9e2;background:#1d303e}[data-theme="dark"] .holiday-label.festival{color:#d7b4e5;background:#33213c}
 .dc.today .dnum{color:var(--actl);font-weight:700}
 .dc.sel-mode{cursor:crosshair}
 .dc.sel-mode:hover{box-shadow:0 0 0 2px var(--ac)}
@@ -584,6 +589,55 @@ body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans G
 <script>
 // ─── Constants ───────────────────────────────────────────────────────────
 const MN  = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+// 2026 年官方节假日与调休安排；网络数据暂时不可用时作为备份。
+const HOLIDAYS_2026={
+  '1-1':['元旦','rest'],'1-2':['元旦','rest'],'1-3':['元旦','rest'],'1-4':['调休上班','work'],
+  '2-14':['调休上班','work'],'2-15':['春节','rest'],'2-16':['春节','rest'],'2-17':['春节','rest'],'2-18':['春节','rest'],'2-19':['春节','rest'],'2-20':['春节','rest'],'2-21':['春节','rest'],'2-22':['春节','rest'],'2-23':['春节','rest'],'2-28':['调休上班','work'],
+  '4-4':['清明','rest'],'4-5':['清明','rest'],'4-6':['清明','rest'],'4-26':['调休上班','work'],
+  '5-1':['劳动节','rest'],'5-2':['劳动节','rest'],'5-3':['劳动节','rest'],'5-4':['劳动节','rest'],'5-5':['劳动节','rest'],'5-9':['调休上班','work'],
+  '6-19':['端午','rest'],'6-20':['端午','rest'],'6-21':['端午','rest'],
+  '9-25':['中秋','rest'],'9-26':['中秋','rest'],'9-27':['中秋','rest'],'9-20':['调休上班','work'],
+  '10-1':['国庆','rest'],'10-2':['国庆','rest'],'10-3':['国庆','rest'],'10-4':['国庆','rest'],'10-5':['国庆','rest'],'10-6':['国庆','rest'],'10-7':['国庆','rest'],'10-10':['调休上班','work']
+};
+const HOLIDAY_CACHE_KEY='mpl-official-holidays';
+let officialHolidays=JSON.parse(localStorage.getItem(HOLIDAY_CACHE_KEY)||'{}');
+let holidayYearsLoading=new Set();
+function traditionalFestival(y,m,d) {
+  const fixed={'1-1':'元旦','3-8':'妇女节','5-4':'青年节','6-1':'儿童节','10-1':'国庆节','12-25':'圣诞节'};
+  const solar=fixed[`${m+1}-${d}`]; if(solar) return [solar,'festival'];
+  try {
+    const parts=new Intl.DateTimeFormat('zh-CN-u-ca-chinese',{month:'long',day:'numeric'}).formatToParts(new Date(y,m,d));
+    let month=parts.find(p=>p.type==='month')?.value.replace('闰','');
+    let day=parts.find(p=>p.type==='day')?.value;
+    // 部分浏览器会把农历日期返回成数字（7），其他浏览器返回中文（初七）。
+    const lunarMonths={'1':'正月','2':'二月','3':'三月','4':'四月','5':'五月','6':'六月','7':'七月','8':'八月','9':'九月','10':'十月','11':'十一月','12':'腊月'};
+    const lunarDays={'1':'初一','2':'初二','5':'初五','7':'初七','8':'初八','15':'十五'};
+    month=lunarMonths[String(month).replace('月','')]||month;
+    day=lunarDays[String(day)]||day;
+    const lunar={'正月-初一':'春节','正月-十五':'元宵节','二月-初二':'龙抬头','五月-初五':'端午节','七月-初七':'七夕','八月-十五':'中秋节','九月-初九':'重阳节','腊月-初八':'腊八节'};
+    return lunar[`${month}-${day}`]?[lunar[`${month}-${day}`],'festival']:null;
+  } catch(e) { return null; }
+}
+function holidayFor(y,m,d) {
+  loadOfficialHolidays(y);
+  return officialHolidays[y]?.[`${m+1}-${d}`] || (y===2026?HOLIDAYS_2026[`${m+1}-${d}`]:null) || traditionalFestival(y,m,d);
+}
+async function loadOfficialHolidays(y) {
+  if(officialHolidays[y]||holidayYearsLoading.has(y)) return;
+  holidayYearsLoading.add(y);
+  try {
+    const res=await fetch(`https://timor.tech/api/holiday/year/${y}/`);
+    const json=await res.json(), source=json.holiday||json, yearData={};
+    Object.entries(source).forEach(([date,item])=>{
+      const match=date.match(/^\d{4}-(\d{1,2})-(\d{1,2})$/);
+      if(!match || !item?.name) return;
+      if(item.holiday===true) yearData[`${+match[1]}-${+match[2]}`]=[item.name,'rest'];
+      else if(item.holiday===false) yearData[`${+match[1]}-${+match[2]}`]=[item.name,'work'];
+    });
+    if(Object.keys(yearData).length) { officialHolidays[y]=yearData; localStorage.setItem(HOLIDAY_CACHE_KEY,JSON.stringify(officialHolidays)); if(cur.getFullYear()===y) render(); }
+  } catch(e) { /* 使用内置备份与传统节日标注 */ }
+  finally { holidayYearsLoading.delete(y); }
+}
 const WDS = ['周日','周一','周二','周三','周四','周五','周六'];
 const SUM_IDS = ['kw','good','improve','moment','next','free'];
 const BG_COLORS = [
@@ -748,6 +802,7 @@ function render() {
     const k=nk(y,m,d), rows=notes[k]||[], dow=(first+d-1)%7;
     const isToday=today.getFullYear()===y&&today.getMonth()===m&&today.getDate()===d;
     const isWknd=dow===5||dow===6, isSel=selDays.has(k), bgId=dayBg[k];
+    const holiday=holidayFor(y,m,d);
     const bgStyle=bgId?`background:${bgV(bgId)};`:'';
     const click=selMode?'':` onclick="openNote(${d})"`;
     const itemsHtml=rows.map((row,index)=>{
@@ -762,13 +817,13 @@ function render() {
         <span class="di-text">${esc(row.text||'')}</span>
       </div>`;
     }).join('');
-    html+=`<div class="dc${isToday?' today':''}${rows.length?' has-note':''}${isWknd?' wknd':''}${selMode?' sel-mode':''}${isSel?' picked':''}"
+    html+=`<div class="dc${isToday?' today':''}${rows.length?' has-note':''}${isWknd?' wknd':''}${holiday?.[1]==='rest'?' holiday-rest':''}${selMode?' sel-mode':''}${isSel?' picked':''}"
       data-day="${d}" style="${bgStyle}"${click}
       ondragover="calendarDayDragOver(event,${d})"
       ondragleave="calendarDayDragLeave(event)"
       ondrop="calendarDayDrop(event,${d})"
       role="button" aria-label="${m+1}月${d}日">
-      <div class="dnum">${d}</div>
+      <div class="dnum">${d}${holiday?`<span class="holiday-label${holiday[1]==='work'?' workday':holiday[1]==='festival'?' festival':''}">${holiday[1]==='work'?'班':holiday[1]==='rest'?holiday[0]+' 休':holiday[0]}</span>`:''}</div>
       <div class="day-items">${itemsHtml}</div>
     </div>`;
   }
